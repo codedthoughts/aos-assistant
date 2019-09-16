@@ -1,8 +1,0 @@
-{
-    "cfg": "tts",
-    "disabled_commands": [],
-    "disabled_process": [
-        "test"
-    ],
-    "tts": false
-}
