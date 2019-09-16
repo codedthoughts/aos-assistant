@@ -20,12 +20,3 @@ class Test(AOSProcess):
 			time.sleep(5)
 			self.manager.process.log.insert("TEST")	
 			
-class TestMenu(AOSProcess):
-	def run(self):	
-		self.manager.addMenuOption('Test', self.testp)
-	
-	def stop(self):
-		self.manager.removeMenuOption('Test')
-		
-	def testp(self):
-		self.manager.process.log.insert("Menu'd")	

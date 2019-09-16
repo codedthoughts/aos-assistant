@@ -95,15 +95,50 @@ class Manager(Thread):
 		self.modules = {'commands': [], 'processes': []}
 		self.waitFor = None
 		self.fallback = None
+		self.exmenus = {}
+		self.exmenuentries = {}
 		
-	def addMenuOption(self, name, call, menu=None):
+	def addMenuOption(self, entry, name, call, menu=None):
 		m = menu or self.process.extramenu
-		m.add_command(label=name, command=call)
+		if not self.exmenus.get(entry, None):
+			menu = Menu(m)
+			m.add_cascade(label=entry, menu=menu)
+			self.exmenus[entry] = menu
+			self.exmenuentries[entry] = 0
+			
+		self.exmenus[entry].add_command(label=name, command=call)
+		self.exmenuentries[entry] += 1
+		print(self.exmenus)
 		
-	def removeMenuOption(self, name, menu=None):
+	def removeMenuOption(self, entry, name, menu=None):
 		m = menu or self.process.extramenu
-		m.delete(m.index(name))
+		if not self.exmenus.get(entry, None):
+			return
 		
+		self.exmenus[entry].delete(self.exmenus[entry].index(name))
+		self.exmenuentries[entry] -= 1
+		if self.exmenuentries[entry] == 0:
+			m.delete(m.index(entry))
+			del self.exmenus[entry]
+			del self.exmenuentries[entry]
+		#self.deleteMenu(name)
+		
+	def makeNewMenu(self, name):
+		try:
+			return self.process.menu.index(name)
+		except:
+			if not self.getMenu(name):
+				menu = Menu(self.process.menu)
+				self.process.menu.add_cascade(label=name, menu=menu)
+				return menu
+			return self.getMenu(name)
+		
+	def deleteMenu(self, name):
+		self.process.menu.delete(self.process.menu.index(name))
+		
+	def promptConfirm(self, message):
+		return askokcancel("Confirm", message)
+	
 	def say(self, text):
 		if not self.conf._get('tts'):
 			self.printf(text, tag="say-notts")
@@ -117,10 +152,11 @@ class Manager(Thread):
 	
 	def takeInput(self, cmd):
 		self.waitFor = cmd
-		
+		self.process.addPromtCanceller(cmd)
 	def clearInput(self):
 		self.waitFor = None
-		
+		self.process.endPromptCanceller()
+	
 	def printf(self, message, **kargs):
 		if kargs.get('tag') == 'debug' and not self.conf._get('debug'):
 			return
@@ -187,6 +223,8 @@ class Manager(Thread):
 						if issubclass(com[1], Command) and com[1] != Command:
 							self.printf(f"Validated {com[1].__name__}", tag='debug')
 							self.commands[com[0].lower()] = com[1](self)
+							if com[1].__name__.lower() not in off_commands:
+								self.commands[com[0].lower()].enable()
 							if modname not in self.modules['commands']:
 								self.modules['commands'].append(modname)
 								self.printf(f"Registered module {modname}", tag='debug')
@@ -205,7 +243,7 @@ class AssistantWindow(Thread):
 		self.win = Tk()
 		self.win.title("AthenaOS Interface")
 		self.win.protocol("WM_DELETE_WINDOW", lambda: quit())
-		self.win.geometry("360x240")
+		self.win.geometry("640x240")
 		self.log = OutputWindow(self.win)
 		self.log.master.grid(row=0, column=0, columnspan=5, rowspan=5, sticky="nswe")
 		self.inputbar = Entry(self.win)
@@ -230,20 +268,29 @@ class AssistantWindow(Thread):
 		self.log.frame.rowconfigure(0, weight=1)
 	
 	
-		menu = Menu(self.win)
-		self.win.config(menu=menu)
-		self.filemenu = Menu(menu)
-		self.helpmenu = Menu(menu)
-		self.extramenu = Menu(menu)
+		self.menu = Menu(self.win)
+		self.win.config(menu=self.menu)
+		self.filemenu = Menu(self.menu)
+		self.helpmenu = Menu(self.menu)
+		self.extramenu = Menu(self.menu)
 		self.filemenu.add_command(label="Modules", command=self.conf_modules)
 		self.filemenu.add_command(label="Commands", command=self.conf_commands)
 		self.filemenu.add_command(label="Processes", command=self.conf_processes)
 		self.helpmenu.add_command(label="About", command=self.about)
-		menu.add_cascade(label="File", menu=self.filemenu)
-		menu.add_cascade(label="Extra", menu=self.extramenu)
-		menu.add_cascade(label="Help", menu=self.helpmenu)
-		
+		self.menu.add_cascade(label="File", menu=self.filemenu)
+		self.menu.add_cascade(label="Extra", menu=self.extramenu)
+		self.menu.add_cascade(label="Help", menu=self.helpmenu)
+		#print(f"Test: {self.menu.nametowidget('File')}")
 		self.win.mainloop()
+	
+	def addPromtCanceller(self, cmd):
+		self.promptmenu = Menu(self.menu)
+		self.promptmenu.add_command(label=f"Cancel {type(cmd).__name__}", command=self.manager.clearInput)
+		self.menu.add_cascade(label="Prompt", menu=self.promptmenu)
+		
+	def endPromptCanceller(self):
+		self.manager.printf("Cancelling current prompt.")
+		self.menu.delete(self.menu.index('Prompt'))
 		
 	def conf_modules(self):
 		self.modules = Toplevel()
@@ -388,8 +435,11 @@ class AssistantWindow(Thread):
 			ls = self.manager.conf.get('disabled_commands', [])
 			if cmd in ls:
 				ls.remove(cmd)
+				self.manager.commands[cmd].enable()
+				
 			else:
 				ls.append(cmd)
+				self.manager.commands[cmd].disable()
 				
 			self.manager.conf._set('disabled_commands', ls)
 			self.commands.destroy()
@@ -411,7 +461,7 @@ class AssistantWindow(Thread):
 			
 		for item in self.manager.commands:
 			if self.manager.commands[item].check(cmd) and item not in self.manager.conf.get('disabled_commands'):
-				self.manager.commands[item].run(cmd)
+				self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))
 				return
 
 		if self.manager.fallback:

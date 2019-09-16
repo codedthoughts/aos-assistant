@@ -7,5 +7,5 @@
     ],
     "fallback": null,
     "test": false,
-    "tts": true
+    "tts": false
 }
