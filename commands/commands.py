@@ -206,6 +206,7 @@ class LimitProcess(Command):
 		if not found:
 			self.delimwin.destroy()
 			self.manager.say("No limiters running.")
+			
 	def delimit(self, proc):
 		for p in psutil.process_iter():
 			if p.name() == "cpulimit":
@@ -234,7 +235,7 @@ class LimitProcess(Command):
 		
 		self.percent = Entry(self.limwin)
 		self.percent.grid(row=1, column=0, columnspan=2, sticky="ew")
-		
+		self.percent.insert(0, '30')
 		self.limwin.rowconfigure(0, weight=1)
 		self.limwin.columnconfigure(0, weight=1)
 		
@@ -300,12 +301,10 @@ class KillProc(Command):
 		self.killwin = None
 		
 	def enable(self):
-		self.manager.addMenuOption('System Manager', 'Kill Process (ask)', lambda: self.run(""))
-		self.manager.addMenuOption('System Manager', 'Kill Process (GUI)', lambda: self.askkill())
+		self.manager.addMenuOption('System Manager', 'Kill Process', lambda: self.askkill())
 		
 	def disable(self):
-		self.manager.removeMenuOption('System Manager', 'Kill Process (ask)')
-		self.manager.removeMenuOption('System Manager', 'Kill Process (GUI)')
+		self.manager.removeMenuOption('System Manager', 'Kill Process')
 	
 	def askkill(self):
 		self.killwin = Toplevel()

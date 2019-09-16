@@ -86,8 +86,8 @@ class OutputWindow:
 
 class Manager(Thread):
 	def run(self):	
-		self.conf = memory.Memory()
 		self.scriptdir = os.path.dirname(os.path.realpath(__file__))+"/"
+		self.conf = memory.Memory(path=self.scriptdir)
 		self.process = AssistantWindow(self)
 		self.process.start()
 		self.commands = {}
