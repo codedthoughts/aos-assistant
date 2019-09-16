@@ -1,0 +1,11 @@
+{
+    "debug": false,
+    "disabled_commands": [],
+    "disabled_modules": [],
+    "disabled_process": [
+        "test"
+    ],
+    "fallback": null,
+    "test": false,
+    "tts": true
+}
