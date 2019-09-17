@@ -1,0 +1,15 @@
+{
+    "contacts": {
+        "Athena": {
+            "name": "Athena"
+        },
+        "Carl": {
+            "name": "Carl"
+        },
+        "Kyle": {
+            "Age": "27",
+            "Number": "UNKNOWN",
+            "name": "Kyle"
+        }
+    }
+}

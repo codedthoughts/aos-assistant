@@ -35,6 +35,7 @@ class OutputWindow:
 		#master.mainloop()
 
 		self.textbox.tag_configure('red', foreground='red')
+		self.textbox.tag_configure('blue', foreground='blue')
 		self.textbox.tag_configure('white', foreground='white')
 		self.textbox.tag_configure('yellow', foreground='yellow')
 		self.textbox.tag_configure('green', foreground='green')
@@ -53,25 +54,28 @@ class OutputWindow:
 		self.textbox.delete(index, end_index)
 		self.textbox.config(state="disabled")
 		
-	def insert(self, text, *, font=[], size=8, command=None, sep="\n", link_id = "", index='end', timestamp=True):
+	def insert(self, text, **kargs):
 		self.textbox.config(state="normal")
 		#print(f"Inserting `{text}` at `{index}`")
 		#print(command)
 		#print(link_id)
-		if command:
-			if link_id == "":
+		sep = kargs.get('sep', "\n")
+		index = kargs.get('index', "end")
+		if kargs.get('command'):
+			if not kargs.get('link_id', None):
 				raise AttributeError("If command is specified, you must give the link a unique ID usin the `link_id` argument.")
+			link_id = kargs.get('link_id')
 			self.textbox.tag_configure(link_id, foreground="blue", underline=1)
 			self.textbox.tag_bind(link_id, "<Enter>", self._enter)
 			self.textbox.tag_bind(link_id, "<Leave>", self._leave)
-			self.textbox.tag_bind(link_id, "<Button-1>", command)
+			self.textbox.tag_bind(link_id, "<Button-1>", kargs.get('command'))
 			self.textbox.insert(index, text+sep, link_id)
 			self.textbox.config(state="disabled")
 			return
 		
-		if timestamp:
+		if kargs.get('timestamp'):
 			text = f"{arrow.now().format('HH:mm:ss')}: {text}"
-		self.textbox.insert(index, f"{text}{sep}", font)
+		self.textbox.insert(index, f"{text}{sep}", kargs.get('font', []))
 		self.textbox.see("end")
 		self.textbox.config(state="disabled")
 	
@@ -87,7 +91,7 @@ class OutputWindow:
 class Manager(Thread):
 	def run(self):	
 		self.scriptdir = os.path.dirname(os.path.realpath(__file__))+"/"
-		self.conf = memory.Memory(path=self.scriptdir)
+		self.conf = memory.Memory(path=self.scriptdir+'configs/')
 		self.process = AssistantWindow(self)
 		self.process.start()
 		self.commands = {}
@@ -97,21 +101,40 @@ class Manager(Thread):
 		self.fallback = None
 		self.exmenus = {}
 		self.exmenuentries = {}
+		self.extconf = {}
 		
-	def addMenuOption(self, entry, name, call, menu=None):
-		m = menu or self.process.extramenu
+	def registerConfig(self, name):
+		if not self.extconf.get(name, None):
+			self.extconf[name] = memory.Memory(path=f'{self.scriptdir}configs/{name}.json')
+	
+	def getConfig(self, name):
+		return self.extconf.get(name, None)
+	
+	def addTool(self, name, call):
+		self.process.toolmenu.add_command(label=name, command=call)
+		
+	def removeTool(self, name):
+		self.process.toolmenu.delete(self.process.toolmenu.index(name))
+		
+	def enableTool(self, name):
+		self.process.toolmenu.entryconfig(name, state="normal")
+		
+	def disableTool(self, name):
+		self.process.toolmenu.entryconfig(name, state="disabled")
+		
+	def addMenuOption(self, entry, name, call):
+		m = self.process.extramenu
 		if not self.exmenus.get(entry, None):
-			menu = Menu(m)
+			menu = Menu(m, tearoff=0)
 			m.add_cascade(label=entry, menu=menu)
 			self.exmenus[entry] = menu
 			self.exmenuentries[entry] = 0
 			
 		self.exmenus[entry].add_command(label=name, command=call)
 		self.exmenuentries[entry] += 1
-		print(self.exmenus)
 		
-	def removeMenuOption(self, entry, name, menu=None):
-		m = menu or self.process.extramenu
+	def removeMenuOption(self, entry, name):
+		m = self.process.extramenu
 		if not self.exmenus.get(entry, None):
 			return
 		
@@ -121,30 +144,18 @@ class Manager(Thread):
 			m.delete(m.index(entry))
 			del self.exmenus[entry]
 			del self.exmenuentries[entry]
-		#self.deleteMenu(name)
-		
-	def makeNewMenu(self, name):
-		try:
-			return self.process.menu.index(name)
-		except:
-			if not self.getMenu(name):
-				menu = Menu(self.process.menu)
-				self.process.menu.add_cascade(label=name, menu=menu)
-				return menu
-			return self.getMenu(name)
-		
-	def deleteMenu(self, name):
-		self.process.menu.delete(self.process.menu.index(name))
 		
 	def promptConfirm(self, message):
 		return askokcancel("Confirm", message)
 	
-	def say(self, text):
+	def say(self, text, **kargs):
 		if not self.conf._get('tts'):
-			self.printf(text, tag="say-notts")
+			kargs['tag'] = "say-notts"
+			self.printf(text, **kargs)
 			return
 		else:
-			self.printf(text, tag="say")
+			kargs['tag'] = "say"
+			self.printf(text, **kargs)
 		
 		text = text.replace('"', "'") 
 		#Preventing the console command breaking if the user inputs quote marks, since the .system will think THEIR quote marks are ending the ones this script uses, and means any other text in the input will be, at best ignored, at worst flite will try and translate them in to command args, which could result in random file dumping and other weird interactions
@@ -153,6 +164,7 @@ class Manager(Thread):
 	def takeInput(self, cmd):
 		self.waitFor = cmd
 		self.process.addPromtCanceller(cmd)
+	
 	def clearInput(self):
 		self.waitFor = None
 		self.process.endPromptCanceller()
@@ -161,17 +173,19 @@ class Manager(Thread):
 		if kargs.get('tag') == 'debug' and not self.conf._get('debug'):
 			return
 		
+		times = kargs.get('timestamp', True)
+		
 		if kargs.get('tag') == 'say':
-			self.process.log.insert(f"[ ATHENA ] {message}")
+			self.process.log.insert(f"[ ATHENA ] {message}", **kargs)
 		elif kargs.get('tag') == 'say-notts':
-			self.process.log.insert(f"[ QUIET ] {message}")	
+			self.process.log.insert(f"[ QUIET ] {message}", **kargs)	
 		else:
-			self.process.log.insert(f"{message}")	
+			self.process.log.insert(f"{message}", **kargs)	
 			
 	def initCacheProcess(self):
 		off_modules = self.conf._get('disabled_modules')
 		off_processes = self.conf._get('disabled_process')
-		self.printf("Getting Process modules...", tag='info')
+		self.printf("Getting Process modules...", tag='debug')
 		for file in os.listdir(self.scriptdir+"process/"):
 			filename = os.fsdecode(file)
 			if filename.endswith(".py"):
@@ -181,7 +195,7 @@ class Manager(Thread):
 					importlib.import_module("process."+modname)
 					clsmembers = inspect.getmembers(sys.modules["process."+modname], inspect.isclass)
 					for com in clsmembers:
-						print(com[1].__name__)
+						#print(com[1].__name__)
 						if issubclass(com[1], AOSProcess) and com[1] != AOSProcess:
 							self.printf(f"Validated {com[1].__name__}", tag='debug')
 							self.processes[com[0].lower()] = com[1](self)
@@ -193,7 +207,7 @@ class Manager(Thread):
 								
 							if modname not in self.modules['processes']:
 								self.modules['processes'].append(modname)
-								self.printf(f"Registered module {modname}")
+								self.printf(f"Registered module {modname}", tag='debug')
 				else:
 					self.printf(f"Not loading {modname}", tag='debug')
 
@@ -210,7 +224,7 @@ class Manager(Thread):
 			
 		off_modules = self.conf._get('disabled_modules')
 		off_commands = self.conf._get('disabled_commands')
-		self.printf("Getting Command modules...", tag='info')
+		self.printf("Getting Command modules...", tag='debug')
 		for file in os.listdir(self.scriptdir+"commands/"):
 			filename = os.fsdecode(file)
 			if filename.endswith(".py"):
@@ -238,25 +252,50 @@ class AssistantWindow(Thread):
 	def __init__(self, manager):
 		super().__init__()
 		self.manager = manager
-		
+		self.listenHandler = None
+	
+	def listen(self):
+		self.inputbar.delete(0, 'end')
+		if self.listenHandler:
+			inp = self.listenHandler() 
+		else:
+			inp = "No listen handler installed."
+		self.inputbar.insert(0, inp)
+
 	def run(self):
 		self.win = Tk()
+		self.menu = Menu(self.win)
+		self.win.config(menu=self.menu)
+		self.filemenu = Menu(self.menu, tearoff=0)
+		self.helpmenu = Menu(self.menu, tearoff=0)
+		self.extramenu = Menu(self.menu, tearoff=0)
+		self.toolmenu = Menu(self.menu, tearoff=0)
+		self.filemenu.add_command(label="Modules", command=self.conf_modules)
+		self.filemenu.add_command(label="Commands", command=self.conf_commands)
+		self.filemenu.add_command(label="Processes", command=self.conf_processes)
+		self.helpmenu.add_command(label="About", command=self.about)
+		self.toolmenu.add_command(label="Clear Log", command=self.clearlog)
+		self.toolmenu.add_command(label="Config", command=self.confwinf)
+		self.menu.add_cascade(label="File", menu=self.filemenu)
+		self.menu.add_cascade(label="Extra", menu=self.extramenu)
+		self.menu.add_cascade(label="Tools", menu=self.toolmenu)
+		self.menu.add_cascade(label="Help", menu=self.helpmenu)
 		self.win.title("AthenaOS Interface")
 		self.win.protocol("WM_DELETE_WINDOW", lambda: quit())
 		self.win.geometry("640x240")
 		self.log = OutputWindow(self.win)
-		self.log.master.grid(row=0, column=0, columnspan=5, rowspan=5, sticky="nswe")
+		self.log.master.grid(row=0, column=0, columnspan=10, rowspan=5, sticky="nswe")
 		self.inputbar = Entry(self.win)
-		self.inputbar.grid(row=6, columnspan=4, sticky="ew")
+		self.inputbar.grid(row=6, columnspan=8, column=0, sticky="ew")
 		self.inputbar.focus()
 		def select_all(widget):
 			self.inputbar.select_range(0, 'end')
 			self.inputbar.icursor('end')
     
 		self.inputbar.bind('<Control-KeyRelease-a>', select_all)	
-		
-		self.inputButton = ttk.Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=4, columnspan=2)
 		self.inputbar.bind('<Return>', self.sendMsg)
+		self.inputButton = ttk.Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=8, columnspan=1)
+		self.voiceButton = ttk.Button(self.win, text="LSTN", width=5, command=self.listen).grid(row=6, column=9, columnspan=1)
 		
 		for i in range(0, 4):
 			self.win.columnconfigure(i, weight=1)
@@ -266,25 +305,83 @@ class AssistantWindow(Thread):
 			
 		self.log.frame.columnconfigure(0, weight=1)
 		self.log.frame.rowconfigure(0, weight=1)
-	
-	
-		self.menu = Menu(self.win)
-		self.win.config(menu=self.menu)
-		self.filemenu = Menu(self.menu)
-		self.helpmenu = Menu(self.menu)
-		self.extramenu = Menu(self.menu)
-		self.filemenu.add_command(label="Modules", command=self.conf_modules)
-		self.filemenu.add_command(label="Commands", command=self.conf_commands)
-		self.filemenu.add_command(label="Processes", command=self.conf_processes)
-		self.helpmenu.add_command(label="About", command=self.about)
-		self.menu.add_cascade(label="File", menu=self.filemenu)
-		self.menu.add_cascade(label="Extra", menu=self.extramenu)
-		self.menu.add_cascade(label="Help", menu=self.helpmenu)
+
 		#print(f"Test: {self.menu.nametowidget('File')}")
 		self.win.mainloop()
 	
+	def clearlog(self):
+		self.log.delete('1.0', 'end')
+	
+	def confwinf(self):
+		self.confwin = Toplevel()
+		self.confwin.title('Config')
+		self.toolmenu.entryconfig("Config", state="disabled")
+		self.confwin.protocol("WM_DELETE_WINDOW", self.destroy_config )
+		cmds = Listbox(self.confwin)
+		cmds.grid(row=0, column=0, columnspan=2, sticky="nswe")
+		logWinScroll = Scrollbar(self.confwin)
+		logWinScroll.grid(column=2, row=0, sticky="ns")
+		logWinScroll.config(command=cmds.yview)
+		cmds.config(yscrollcommand=logWinScroll.set)
+		
+		for item in self.manager.conf.get():
+			cmds.insert('end', item)
+		cmds.bind('<<ListboxSelect>>', self.onselect_config)
+		
+		ttk.Button(self.confwin, text="Create New Entry", command=self.askCreateNew).grid(column=0, row=1, columnspan=2)
+	
+	def askCreateNew(self):
+		self.confwin.destroy()
+		self.askCrWin = Toplevel()
+		self.askCrEn = Entry(self.askCrWin)
+		self.askCrEn.grid()
+		ttk.Button(self.askCrWin, text="Create New Entry", command=lambda: self.editConfVar(self.askCrWin, self.askCrEn.get())).grid(column=0, row=1, columnspan=2)
+		
+	def destroy_config(self):
+		self.toolmenu.entryconfig("Config", state="normal")
+		self.confwin.destroy()
+		
+	def onselect_config(self, evt):
+		w = evt.widget
+		selection=w.curselection()
+		try:
+			cmd = w.get(selection[0])	
+			self.editConfVar(self.confwin, cmd)
+		except:
+			pass
+	
+	def editConfVar(self, hostwin, cmd):
+		editor = Toplevel()
+		hostwin.destroy()
+		value = self.manager.conf.get(cmd, '')
+		editor.protocol("WM_DELETE_WINDOW", lambda: self.destroyeditor(editor) )				
+		if type(value) == str:
+			en = Entry(editor)
+			en.pack()
+			en.insert('0', value)
+			send = ttk.Button(editor, text="Confirm", command=lambda: self.send_config(editor, cmd, en.get()))
+			send.pack()
+
+		elif type(value) == bool:
+			ttk.Button(editor, text="TRUE", command=lambda: self.send_config(editor, cmd, True)).pack()
+			ttk.Button(editor, text="FALSE", command=lambda: self.send_config(editor, cmd, False)).pack()
+			
+		else:
+			self.manager.say(f"Type {type(value)} currently not supported in live editing.")
+			self.manager.say(f"{value}")
+			editor.destroy()
+			self.confwinf()		
+			
+	def destroyeditor(self, editor_window):
+		editor_window.destroy()
+		self.confwinf()
+		
+	def send_config(self, editor_window, key, value):
+		self.manager.conf._set(key, value)
+		self.destroyeditor(editor_window)
+		
 	def addPromtCanceller(self, cmd):
-		self.promptmenu = Menu(self.menu)
+		self.promptmenu = Menu(self.menu, tearoff=0)
 		self.promptmenu.add_command(label=f"Cancel {type(cmd).__name__}", command=self.manager.clearInput)
 		self.menu.add_cascade(label="Prompt", menu=self.promptmenu)
 		
@@ -341,8 +438,14 @@ class AssistantWindow(Thread):
 					
 			self.manager.conf._set('disabled_modules', ls)
 			self.modules.destroy()
+			
 			for item in copy.copy(self.manager.processes):
 				self.manager.processes[item].stop()
+				del self.manager.processes[item]
+				
+			for item in copy.copy(self.manager.commands):
+				self.manager.commands[item].disable()
+				del self.manager.commands[item]
 				
 			self.manager.commands = {}
 			self.manager.processes = {}
@@ -472,5 +575,12 @@ man.start()
 man.join()
 man.initCacheCommands()
 man.initCacheProcess()
+man.say(f"Hello, {man.conf.get('name', 'there')}.")
+man.printf(f"This is a", sep=" ")
+man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("lol"))
+man.printf(f".", sep="\n")
+man.printf(f"This is a", sep=" ")
+man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
+man.printf(f".", sep="\n")
 #test = AOSProcess(man)
 #test.start()

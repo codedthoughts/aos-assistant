@@ -1,0 +1,16 @@
+{
+    "debug": false,
+    "disabled_commands": [],
+    "disabled_modules": [],
+    "disabled_process": [
+        "test"
+    ],
+    "fallback": null,
+    "name": "Kaiser",
+    "terminal": "xfce4-terminal --hold -x $s",
+    "test": {
+        "bork": "lol"
+    },
+    "teststr": "lol ok",
+    "tts": true
+}

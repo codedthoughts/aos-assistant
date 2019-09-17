@@ -1,10 +1,13 @@
 import shlex
 import psutil
 import os
+import subprocess
 from tkinter import *
 from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
+import random
+import humanfriendly
 
 class Command:
 	def __init__(self, manager):
@@ -17,17 +20,24 @@ class Command:
 		
 	def disable(self):
 		pass
-						
+		
+	def dontCheck(self, message):
+		return False
+	
 	def checkStart(self, message):
 		if len(self.alias):
 			for alias in self.alias:
 				if message.lower().startswith(f"{alias} "):
 					return True
-						
+				
+				if message.lower().startswith(f"{alias}"):
+					return True		
 		else:
 			if message.lower().startswith(f"{type(self).__name__.lower()} "):
 				return True
 			
+			if message.lower().startswith(f"{type(self).__name__.lower()}"):
+				return True
 		return False
 	
 	def checkFull(self, message):
@@ -56,13 +66,236 @@ class Command:
 			for alias in self.alias:
 				if msg.lower().startswith(f"{alias} "):
 					return msg[len(alias)+1:]
+				
 				if msg.lower().startswith(f"{alias}"):
-					return msg[len(alias)+1:]
+					return msg[len(alias):]
 		else:
 			if msg.startswith(f"{type(self).__name__.lower()} "):
 				return msg[len(type(self).__name__.lower())+1:]
 			
+			if msg.startswith(f"{type(self).__name__.lower()}"):
+				return msg[len(type(self).__name__.lower()):]
 		return msg
+	
+class SphinxListener(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.check = self.dontCheck
+		
+	def enable(self):
+		if not self.manager.process.listenHandler:
+			self.manager.process.listenHandler = self.listen
+			
+	def disable(self):
+		if self.manager.process.listenHandler == self.listen:
+			self.manager.process.listenHandler = None
+	
+	def listen(self):
+		return "Not yet functional, coming soon."
+	
+class Bash(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['bash', '$']
+	
+	def run(self, message):
+		term = self.manager.conf.get('terminal', None)
+		if term:
+			os.system(term.replace('$s', message+"&"))
+		else:
+			p = subprocess.run(message.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+			output = p.stdout
+			exitcode = p.returncode
+			
+			if output:
+				self.manager.printf(f" --- OUTPUT ---")
+				self.manager.printf(output.decode('utf-8'), timestamp=False)
+
+			self.manager.printf(f"EXIT CODE: {exitcode}", timestamp=False)
+			self.manager.printf(f" --- ----- ---")
+			
+class EightBall(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['8ball']
+		
+	def run(self, message):
+		responses = ["as I see it, yes",
+		"ask again later",
+		"better not tell you now",
+		"cannot predict now",
+		"concentrate and ask again",
+		"don’t count on it",
+		"it is certain",
+		"it is decidedly so",
+		"most likely",
+		"my reply is no",
+		"my sources say no",
+		"outlook good",
+		"outlook not so good",
+		"reply hazy try again",
+		"signs point to yes",
+		"very doubtful",
+		"without a doubt",
+		"yes",
+		"yes, definitely",
+		"you may rely on it"]
+		res = random.choice(responses)
+		self.manager.say(res.capitalize()+".")	
+		
+class Roll(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		
+	def run(self, message):
+		if message == "":
+			message = "10"
+		if not message.isdigit():
+			return self.message("Value must be a number.")
+		random.randint(0, int(message))
+		self.manager.say(f"You rolled {random.randint(0, int(message))} out of {message}.")
+		
+class Flip(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		
+	def run(self, message):
+		if random.random() < 0.5:
+			self.manager.say(f"You flipped heads.")
+		else:
+			self.manager.say(f"You flipped tails.")
+
+class Dice(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		
+	def run(self, message):
+		notation = message
+		if not notation:
+			notation = "2d6"
+		try:
+			dm = 0
+			if "+" in notation:
+				dm = int(notation.split("+")[1]) #modifier; 2d12+2 adds 2 to total
+				notation = notation.split("+")[0]
+			dn = int(notation.split("d")[0]) #number of die; eg 2d12 is 2
+			ds = int(notation.split("d")[1]) #sides of the die; eg 2d12 is 12
+			if dn <= 0 or ds <= 1:
+				return self.message("Dice count should be above 1 and sides should be above 0.")
+			
+			dies = []
+			while dn > 0:
+				dies.append(random.randint(1, ds))
+				dn -= 1
+
+			dies_sl = []
+			dies_total = 0
+			for item in dies:
+				dies_total += int(item)
+				dies_sl.append(str(item))
+			
+			if dm > 0:
+				dies_total += dm
+				dies_total = f"{dies_total} (+{dm})"
+				
+			dies_string = humanfriendly.text.concatenate(dies_sl)
+
+			self.manager.say(f"You rolled {dies_string}. (Total: {dies_total})")
+		except IndexError:
+			self.manager.say("Error in notation; example is `2d6`.")
+		except ValueError:
+			self.manager.say("One of the values is not a real number.")
+		except Exception as e:
+			self.manager.say(f"Some problem; {e}")		
+
+class Calculate(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['calc']
+	
+	def run(self, message):
+		try:
+			value = eval(message, {})
+			return self.manager.say(f"{message} evaluates to {str(value)}")
+		except Exception as e:
+			return self.manager.say("Syntax error.")
+		
+class Eval(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['eval', 'py']
+		
+	def enable(self):
+		self.manager.addMenuOption('Python', 'Evaluate', lambda: self.evalmenu())
+		
+	def disable(self):
+		self.manager.removeMenuOption('Python', 'Evaluate')		
+		
+	def run(self, message):
+		eval(message)
+		
+	def evalmenu(self):
+		w = Toplevel()
+		self.textbox = Text(w, height=20, width=70)
+		self.textbox.grid(row=0, column=0, columnspan=5)
+		logWinScroll = Scrollbar(w)
+		logWinScroll.grid(column=5, row=0, sticky="ns")
+		logWinScroll.config(command=self.textbox.yview)
+		self.textbox.config(yscrollcommand=logWinScroll.set)
+		
+		self.fileselecten = Entry(w)
+		self.fileselecten.grid(row=1, column=0)
+		
+		
+		ttk.Button(w, text="Open", command=self.openFile).grid(row=1, column=1)
+		ttk.Button(w, text="Save", command=self.saveFile).grid(row=1, column=2)
+		ttk.Button(w, text="Evaluate", command=self.execute).grid(row=1, column=3)
+	
+	def getPath(self):
+		if not self.fileselecten.get():
+			path = self.manager.scriptdir+'_temp/eval.py'
+		else:
+			path = self.manager.scriptdir+'_temp/'+self.fileselecten.get()+'.py'
+			
+		return path
+	
+	def openFile(self):
+		if not os.path.isdir(self.manager.scriptdir+'_temp'):
+			os.mkdir(self.manager.scriptdir+'_temp')
+			
+		path = self.getPath()
+		
+		if os.path.isfile(path):
+			with open(path, 'r') as f:
+				self.textbox.delete('1.0', 'end')
+				self.textbox.insert('1.0', f.read())
+				
+	def saveFile(self):
+		if not os.path.isdir(self.manager.scriptdir+'_temp'):
+			os.mkdir(self.manager.scriptdir+'_temp')
+			
+		path = self.getPath()
+			
+		#print(path)	
+		with open(path, 'w') as f:
+			f.write(self.textbox.get(1.0, 'end'))
+				
+	def execute(self):
+		self.saveFile()
+		path = self.getPath()
+		#os.system(f"{self.manager.get('python_command', 'python3')} {path}")
+		p = subprocess.run([self.manager.conf.get('python_command', 'python3'), path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+		output = p.stdout
+		exitcode = p.returncode
+		
+		if output:
+			self.manager.printf(f" --- OUTPUT ---")
+			self.manager.printf(output.decode('utf-8'), timestamp=False)
+
+		self.manager.printf(f"EXIT CODE: {exitcode}", timestamp=False)
+		self.manager.printf(f" --- ----- ---")
 		
 class Set(Command):
 	def run(self, message):		
@@ -107,8 +340,7 @@ class Echo(Command):
 		self.check = self.checkMulti
 		
 	def run(self, message):
-		message = self.filterSelf(message)
-
+		#print(message)
 		if not message:
 			self.manager.say(f"You enter echo mode.")
 			self.manager.takeInput(self)
@@ -191,7 +423,6 @@ class LimitProcess(Command):
 		
 		found = False
 		for p in psutil.process_iter():
-			#print(p.name())
 			if p.name() == "cpulimit":
 				cmd = p.cmdline()
 				pid = cmd[cmd.index("--pid")+1]
@@ -249,7 +480,7 @@ class LimitProcess(Command):
 			self.proclist.insert('end', item)
 			
 	def run(self, message):
-		print(message)
+		#print(message)
 		if not message:
 			self.manager.say(f"What process should be limited? Say CANCEL to stop changing.")
 			self.manager.takeInput(self)
@@ -265,7 +496,7 @@ class LimitProcess(Command):
 			self.manager.say("Should be in format of <process limit_percent>.")
 			
 	def send(self, message):
-		print(message)
+		#print(message)
 		if message.lower() == "cancel":
 			self.manager.clearInput()
 			self.manager.say("Cancelled.")
@@ -328,7 +559,7 @@ class KillProc(Command):
 			self.proclist.insert('end', item)
 			
 	def run(self, message):
-		print(message)
+		#print(message)
 		if not message:
 			self.manager.say(f"What process should be killed? Say CANCEL to stop changing.")
 			self.manager.takeInput(self)
@@ -337,7 +568,7 @@ class KillProc(Command):
 		self.killTarget(message)
 		
 	def send(self, message):
-		print(message)
+		#print(message)
 		if message.lower() == "cancel":
 			self.manager.clearInput()
 			self.manager.say("Cancelled.")
