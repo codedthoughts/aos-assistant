@@ -8,6 +8,8 @@ from tkinter.ttk import *
 from tkinter.messagebox import *
 import random
 import humanfriendly
+from pocketsphinx import LiveSpeech
+import textblob
 
 class Command:
 	def __init__(self, manager):
@@ -91,29 +93,112 @@ class SphinxListener(Command):
 			self.manager.process.listenHandler = None
 	
 	def listen(self):
-		return "Not yet functional, coming soon."
+		self.manager.printf(f" --- SPEAK ---")
+		p = subprocess.run([self.manager.conf.get('python_command', 'python3'), self.manager.scriptdir+'sph.py'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+		output = p.stdout
+		exitcode = p.returncode
+		
+		if output:
+			return output.decode('utf-8')[:-1]
+
+class AddSystemTool(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['add tool']
+		
+	def enable(self):
+		self.manager.addMenuOption('Custom Tools', 'Add Tool', self.addToolMenu)
+		self.manager.addMenuOption('Custom Tools', 'Remove Tool', self.remToolMenu)
+	def disable(self):
+		self.manager.removeMenuOption('Custom Tools', 'Add Tool')	
+		self.manager.removeMenuOption('Custom Tools', 'Remove Tool')
+		
+	def addToolMenu(self):
+		self.addToolWin = Toplevel()
+		Label(self.addToolWin, text="Name:").grid(row=0, column=0)
+		self.name_entry = Entry(self.addToolWin)
+		self.name_entry.grid(row=0, column=1)
+		Label(self.addToolWin, text="Command:").grid(row=1, column=0)
+		self.command_entry = Entry(self.addToolWin)
+		self.command_entry.grid(row=1, column=1)
+		ttk.Button(self.addToolWin, text="Confirm", command=self.sendAddTool).grid(row=2, columnspan=2)
+		
+	def sendAddTool(self):
+		if self.name_entry.get() and self.command_entry.get():
+			self.run(f"{self.name_entry.get()} {self.command_entry.get()}")
+			self.addToolWin.destroy()
+			
+	def remToolMenu(self):
+		self.remToolWin = Toplevel()
+		self.toollist = Listbox(self.remToolWin)
+		self.toollist.grid(row=0, column=0, columnspan=2, sticky="nswe")
+		logWinScroll = Scrollbar(self.remToolWin)
+		logWinScroll.grid(column=2, row=0, sticky="ns")
+		logWinScroll.config(command=self.toollist.yview)
+		self.toollist.config(yscrollcommand=logWinScroll.set)
+		
+		custom_tools = self.manager.conf.get('custom_tools', {})
+		for item in custom_tools:
+			self.toollist.insert('end', item)
+			
+		self.remToolWin.rowconfigure(0, weight=1)
+		self.remToolWin.columnconfigure(0, weight=1)
+		
+		self.toollist.bind('<<ListboxSelect>>', self.askRemTool)
 	
+	def askRemTool(self, evt):
+		name = evt.widget.get(evt.widget.curselection()[0])
+		if self.manager.promptConfirm(f'Really delete tool {name}?'):
+			self.remToolWin.destroy()
+			custom_tools = self.manager.conf.get('custom_tools', [])
+			del custom_tools[name]
+			self.manager.conf._set('custom_tools', custom_tools)
+			self.manager.removeTool(name)
+	def run(self, message):
+		name = shlex.split(message)[0]
+		command = message[len(name)+1:]
+		
+		if not command:
+			command = name
+			
+		custom_tools = self.manager.conf.get('custom_tools', {})
+		custom_tools[name] = command
+		self.manager.conf._set('custom_tools', custom_tools)
+
+		if self.manager.conf.get('custom_tools_terminal', "NOTSET") == "NOTSET" and self.manager.conf.get('terminal', None):
+			self.manager.conf._set('custom_tools_terminal', True)
+			
+		self.manager.say('New custom tool added.')
+		self.manager.printf(f"Name: {name}")
+		self.manager.printf(f"Command: {command}")
+		self.manager.addTool(name, lambda: self.manager.systemCall(command))
+		
+class Translate(Command):
+	def run(self, message):
+		if len(shlex.split(message)) > 2:
+			if shlex.split(message)[-2] == "to":
+				lang = shlex.split(message)[-1]
+				message = message[:-6]
+		else:
+			lang = self.manager.conf.get('default_translator', 'de')
+		
+		
+		msg = textblob.TextBlob(message)
+		try:
+			self.manager.say(msg.translate(to=lang))
+		except textblob.exceptions.NotTranslated:
+			self.manager.say("The text was not translated. Are you trying to translate to and from the same language, or the word couldn't be translated?")
+		except textblob.exceptions.TranslatorError:
+			self.manager.say("There was an error on the translator side. Maybe try again later?")	
+
 class Bash(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
 		self.alias = ['bash', '$']
 	
 	def run(self, message):
-		term = self.manager.conf.get('terminal', None)
-		if term:
-			os.system(term.replace('$s', message+"&"))
-		else:
-			p = subprocess.run(message.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-			output = p.stdout
-			exitcode = p.returncode
-			
-			if output:
-				self.manager.printf(f" --- OUTPUT ---")
-				self.manager.printf(output.decode('utf-8'), timestamp=False)
-
-			self.manager.printf(f"EXIT CODE: {exitcode}", timestamp=False)
-			self.manager.printf(f" --- ----- ---")
+		self.manager.systemCall(message)
 			
 class EightBall(Command):
 	def __init__(self, manager):

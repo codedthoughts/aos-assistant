@@ -102,6 +102,34 @@ class Manager(Thread):
 		self.exmenus = {}
 		self.exmenuentries = {}
 		self.extconf = {}
+		self.history_index = 0
+		self.history = self.conf.get('history', [])
+		
+	def systemCall(self, command):
+		print(command)
+		term = self.conf.get('terminal', None)
+		if term:
+			os.system(term.replace('$s', command+"&"))
+		else:
+			p = subprocess.run(command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+			output = p.stdout
+			exitcode = p.returncode
+			
+			if output:
+				self.printf(f" --- OUTPUT ---")
+				self.printf(output.decode('utf-8'), timestamp=False)
+
+			self.printf(f"EXIT CODE: {exitcode}", timestamp=False)
+			self.printf(f" --- ----- ---")
+			
+	def addHistory(self, message):
+		self.history_index = 0
+		self.history.append(message)
+		if len(self.history) > 9:
+			del self.history[0]
+			
+		self.conf._set('history', self.history)
 		
 	def registerConfig(self, name):
 		if not self.extconf.get(name, None):
@@ -257,7 +285,7 @@ class AssistantWindow(Thread):
 	def listen(self):
 		self.inputbar.delete(0, 'end')
 		if self.listenHandler:
-			inp = self.listenHandler() 
+			inp = self.listenHandler()
 		else:
 			inp = "No listen handler installed."
 		self.inputbar.insert(0, inp)
@@ -273,8 +301,13 @@ class AssistantWindow(Thread):
 		self.filemenu.add_command(label="Modules", command=self.conf_modules)
 		self.filemenu.add_command(label="Commands", command=self.conf_commands)
 		self.filemenu.add_command(label="Processes", command=self.conf_processes)
+		self.filemenu.add_separator()
+		self.filemenu.add_command(label="Clear Log", command=self.clearlog)
+		self.filemenu.add_separator()
+		self.filemenu.add_command(label="Exit", command=lambda: quit())
+		
 		self.helpmenu.add_command(label="About", command=self.about)
-		self.toolmenu.add_command(label="Clear Log", command=self.clearlog)
+		
 		self.toolmenu.add_command(label="Config", command=self.confwinf)
 		self.menu.add_cascade(label="File", menu=self.filemenu)
 		self.menu.add_cascade(label="Extra", menu=self.extramenu)
@@ -292,7 +325,29 @@ class AssistantWindow(Thread):
 			self.inputbar.select_range(0, 'end')
 			self.inputbar.icursor('end')
     
+		def cycleHistUp(evt):
+			self.manager.history_index -= 1
+			if self.manager.history_index < 0:
+				self.manager.history_index = (len(self.manager.history)-1)
+				
+			self.inputbar.delete(0, 'end')
+			try:
+				self.inputbar.insert(0, self.manager.history[self.manager.history_index])
+			except:
+				pass
+			
+		def cycleHistDown(evt):
+			self.manager.history_index += 1
+			if self.manager.history_index >= len(self.manager.history):
+				self.manager.history_index = 0
+			self.inputbar.delete(0, 'end')
+			try:
+				self.inputbar.insert(0, self.manager.history[self.manager.history_index])	
+			except:
+				pass
 		self.inputbar.bind('<Control-KeyRelease-a>', select_all)	
+		self.inputbar.bind('<Up>', cycleHistUp)
+		self.inputbar.bind('<Down>', cycleHistDown)
 		self.inputbar.bind('<Return>', self.sendMsg)
 		self.inputButton = ttk.Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=8, columnspan=1)
 		self.voiceButton = ttk.Button(self.win, text="LSTN", width=5, command=self.listen).grid(row=6, column=9, columnspan=1)
@@ -307,8 +362,12 @@ class AssistantWindow(Thread):
 		self.log.frame.rowconfigure(0, weight=1)
 
 		#print(f"Test: {self.menu.nametowidget('File')}")
+		custom_tools = self.manager.conf.get('custom_tools', {})
+		for item in custom_tools:
+			self.manager.addTool(item, lambda: self.manager.systemCall(custom_tools[item]))	
+			
 		self.win.mainloop()
-	
+
 	def clearlog(self):
 		self.log.delete('1.0', 'end')
 	
@@ -555,6 +614,7 @@ class AssistantWindow(Thread):
 		
 	def sendMsg(self, evt=None):
 		cmd = self.inputbar.get()
+		self.manager.addHistory(cmd)
 		self.inputbar.delete(0, 'end')
 		self.log.insert(cmd, font=['gray'])
 		
