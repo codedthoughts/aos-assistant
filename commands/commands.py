@@ -8,7 +8,6 @@ from tkinter.ttk import *
 from tkinter.messagebox import *
 import random
 import humanfriendly
-from pocketsphinx import LiveSpeech
 import textblob
 
 class Command:
@@ -110,6 +109,7 @@ class AddSystemTool(Command):
 	def enable(self):
 		self.manager.addMenuOption('Custom Tools', 'Add Tool', self.addToolMenu)
 		self.manager.addMenuOption('Custom Tools', 'Remove Tool', self.remToolMenu)
+		
 	def disable(self):
 		self.manager.removeMenuOption('Custom Tools', 'Add Tool')	
 		self.manager.removeMenuOption('Custom Tools', 'Remove Tool')
@@ -173,8 +173,67 @@ class AddSystemTool(Command):
 		self.manager.printf(f"Name: {name}")
 		self.manager.printf(f"Command: {command}")
 		self.manager.addTool(name, lambda: self.manager.systemCall(command))
+	
+class DefineWord(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['define']
 		
+	def run(self, message):
+		try:
+			blob = textblob.Word(message)
+			defs = blob.definitions
+			s = ""
+			if len(defs) > 0:
+				for item in defs[0:4]:
+					s += item.capitalize()+".\n"
+				self.manager.say(s)
+			else:
+				self.manager.say("No result found.")
+		except RuntimeError:	
+			blob = textblob.Word(message)
+			defs = blob.definitions
+			s = ""
+			if len(defs) > 0:
+				for item in defs[0:4]:
+					s += item.capitalize()+".\n"
+				self.manager.say(s)
+			else:
+				self.manager.say("No result found.")
+				
 class Translate(Command):
+	def enable(self):
+		self.manager.addTool('Translator', self.translateWindow)
+		
+	def disable(self):
+		self.manager.removeTool('Translator')	
+	
+	def translateWindow(self):
+		w = Toplevel()
+		self.tr_input = Text(w, height=20, width=30)
+		self.tr_output = Text(w, height=20, width=30)
+		self.tr_lang = Entry(w)
+		
+		self.tr_input.grid(row=0, column=0, columnspan=2)
+		self.tr_output.grid(row=0, column=3)
+		self.tr_lang.grid(row=1, column=0)
+		self.tr_lang.insert('end', self.manager.conf.get('default_translator', 'de'))
+		ttk.Button(w, text="Translate", command=self.execTranslate).grid(row=1, column=1)
+	
+	def execTranslate(self):
+		tolang = self.tr_lang.get()
+		self.tr_output.delete('1.0', 'end')
+		if tolang != self.manager.conf.get('default_translator', 'de'):
+			self.manager.conf._set('default_translator', tolang)
+			
+		msg = textblob.TextBlob(self.tr_input.get('1.0', 'end'))
+		try:
+			self.tr_output.insert('1.0', msg.translate(to=tolang))
+		except textblob.exceptions.NotTranslated:
+			self.tr_output.insert('1.0', "The text was not translated. Are you trying to translate to and from the same language, or the word couldn't be translated?")
+		except textblob.exceptions.TranslatorError:
+			self.tr_output.insert('1.0', "There was an error on the translator side. Maybe try again later?")	
+			
 	def run(self, message):
 		if len(shlex.split(message)) > 2:
 			if shlex.split(message)[-2] == "to":

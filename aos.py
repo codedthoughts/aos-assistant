@@ -8,6 +8,8 @@ import memory
 from commands.commands import Command
 from process.process import AOSProcess
 import os
+import subprocess
+import shlex
 import importlib
 import inspect
 import sys
@@ -104,14 +106,21 @@ class Manager(Thread):
 		self.extconf = {}
 		self.history_index = 0
 		self.history = self.conf.get('history', [])
+	
+	def addUIScrollbar(self, widget):
+		scroll = Scrollbar(widget.grid_info()['in'])
+		
+		scroll.config(command=widget.yview)
+		widget.config(yscrollcommand=scroll.set)
+		scroll.grid(column=widget.grid_info()['column']+1, row=widget.grid_info()['row'], sticky="ns", rowspan=widget.grid_info()['rowspan'])
+		return scroll #.grid(column=2, row=0, sticky="ns")
 		
 	def systemCall(self, command):
-		print(command)
 		term = self.conf.get('terminal', None)
 		if term:
 			os.system(term.replace('$s', command+"&"))
 		else:
-			p = subprocess.run(command.split(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			p = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 			output = p.stdout
 			exitcode = p.returncode
@@ -122,7 +131,13 @@ class Manager(Thread):
 
 			self.printf(f"EXIT CODE: {exitcode}", timestamp=False)
 			self.printf(f" --- ----- ---")
-			
+	
+	def systemInvoke(self, command):
+		p = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+		output = p.stdout
+		return output
+	
 	def addHistory(self, message):
 		self.history_index = 0
 		self.history.append(message)
@@ -203,13 +218,40 @@ class Manager(Thread):
 		
 		times = kargs.get('timestamp', True)
 		
-		if kargs.get('tag') == 'say':
-			self.process.log.insert(f"[ ATHENA ] {message}", **kargs)
-		elif kargs.get('tag') == 'say-notts':
-			self.process.log.insert(f"[ QUIET ] {message}", **kargs)	
+		if "||" in message:
+			msg_arr = message.split("||")
+			if kargs.get('tag') == 'say':
+				self.process.log.insert(f"[ ", sep="")
+				self.process.log.insert(f"ATHENA", sep="", font=['blue'])
+				self.process.log.insert(f" ] ", sep="")
+			elif kargs.get('tag') == 'say-notts':
+				self.process.log.insert(f"[ ", sep="")
+				self.process.log.insert(f"SYSTEM", sep="", font=['blue'])
+				self.process.log.insert(f" ] ", sep="")
+			cnt = 0
+			for item in msg_arr:
+				targ = copy.copy(kargs)
+				if (cnt % 2) == 0:
+					del targ['link_id']
+					del targ['command']
+				
+				self.process.log.insert(item, **targ, sep="")
+				cnt += 1	
+			self.process.log.insert("\n", sep="")	
 		else:
-			self.process.log.insert(f"{message}", **kargs)	
-			
+			if kargs.get('tag') == 'say':
+				self.process.log.insert(f"[ ", sep="")
+				self.process.log.insert(f"ATHENA", sep="", font=['blue'])
+				self.process.log.insert(f" ] ", sep="")
+
+			elif kargs.get('tag') == 'say-notts':
+				self.process.log.insert(f"[ ", sep="")
+				self.process.log.insert(f"SYSTEM", sep="", font=['blue'])
+				self.process.log.insert(f" ] ", sep="")
+		
+			self.process.log.insert(f"{message}", **kargs)
+	
+				
 	def initCacheProcess(self):
 		off_modules = self.conf._get('disabled_modules')
 		off_processes = self.conf._get('disabled_process')
@@ -616,7 +658,7 @@ class AssistantWindow(Thread):
 		cmd = self.inputbar.get()
 		self.manager.addHistory(cmd)
 		self.inputbar.delete(0, 'end')
-		self.log.insert(cmd, font=['gray'])
+		self.log.insert(f"[ {man.conf.get('name', 'You')} ] {cmd}", font=['gray'])
 		
 		if self.manager.waitFor:
 			self.manager.waitFor.send(cmd)
@@ -636,11 +678,13 @@ man.join()
 man.initCacheCommands()
 man.initCacheProcess()
 man.say(f"Hello, {man.conf.get('name', 'there')}.")
-man.printf(f"This is a", sep=" ")
-man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("lol"))
-man.printf(f".", sep="\n")
-man.printf(f"This is a", sep=" ")
-man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
-man.printf(f".", sep="\n")
+#man.printf(f"This is a", sep=" ")
+#man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("lol"))
+#man.printf(f".", sep="\n")
+#man.printf(f"This is a", sep=" ")
+#man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
+#man.printf(f".", sep="\n")
+#man.say(f"This ||may|| be a link.", link_id="test1", command=lambda evt: print("heh"))
+#man.printf(f"This ||iisssss|| be a link.", link_id="test1", command=lambda evt: print("heh"))
 #test = AOSProcess(man)
 #test.start()

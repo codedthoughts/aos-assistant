@@ -2,6 +2,7 @@
     "custom_tools": {},
     "custom_tools_terminal": true,
     "debug": false,
+    "default_translator": "ru",
     "disabled_commands": [],
     "disabled_modules": [],
     "disabled_process": [
@@ -9,14 +10,18 @@
     ],
     "fallback": null,
     "history": [
-        "say",
-        "one",
-        "two",
-        "add tool ls",
-        "add tool List ls",
-        "add tool echo"
+        "play rebecca black do you/",
+        "now playing",
+        "fave",
+        "fave Rebecca Black - The Great Divide",
+        "play HIGHSOCIETY - Fake Feat Amy",
+        "fave",
+        "play Neovaii - Crash",
+        "play Neovaii - Crash",
+        "fave"
     ],
     "name": "Kaiser",
+    "now_playing": "",
     "terminal": "xfce4-terminal --hold -x $s",
     "test": {
         "bork": "lol"
