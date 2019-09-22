@@ -1,0 +1,12 @@
+{
+    "theme": {
+        "button": {
+            "background": "#d9d9d9",
+            "foreground": "#000000",
+            "padding": "3 3",
+            "relief": "raised"
+        }
+    },
+    "theme_outputwin": "#333333",
+    "theme_outputwin_font": "green4"
+}

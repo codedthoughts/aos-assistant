@@ -3,7 +3,6 @@ import psutil
 import os
 import subprocess
 from tkinter import *
-from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
 import random
@@ -15,6 +14,7 @@ class Command:
 		self.manager = manager
 		self.alias = []
 		self.check = self.checkStart
+		self.runThreaded = False
 		
 	def enable(self):
 		pass
@@ -101,6 +101,90 @@ class SphinxListener(Command):
 		if output:
 			return output.decode('utf-8')[:-1]
 
+class DefaultThemingEngine(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.check = self.dontCheck
+		self.manager.registerConfig('theme')
+		self.style = Style()
+		
+	def enable(self):
+		self.manager.addTool('Edit Theme', self.themeList)
+		self.loadTheme()
+		
+	def disable(self):
+		self.manager.removeTool('Edit Theme')	
+
+	def themeList(self):
+		self.themelistwin = Toplevel()
+
+		Label(self.themelistwin, text="Log Window background:").grid(row=0, column=0)
+		self.textbox_bg = Entry(self.themelistwin)
+		self.textbox_bg.grid(row=0, column=1)
+		self.textbox_bg.insert(0, self.manager.process.log.textbox['background'])
+		
+		Label(self.themelistwin, text="Log Window Font Colour:").grid(row=0, column=2)
+		self.textbox_fg = Entry(self.themelistwin)
+		self.textbox_fg.grid(row=0, column=3)
+		self.textbox_fg.insert(0, self.manager.process.log.textbox['foreground'])
+		
+		Label(self.themelistwin, text="Buttons background:").grid(row=1, column=0)
+		self.button_bg = Entry(self.themelistwin)
+		self.button_bg.grid(row=1, column=1)
+		self.button_bg.insert(0, self.style.lookup("TButton", "background"))
+
+		Label(self.themelistwin, text="Buttons padding:").grid(row=2, column=0)
+		self.button_fbg = Entry(self.themelistwin)
+		self.button_fbg.grid(row=2, column=1)
+		self.button_fbg.insert(0, self.style.lookup("TButton", "padding"))
+		
+		Label(self.themelistwin, text="Buttons foreground:").grid(row=3, column=0)
+		self.button_fg = Entry(self.themelistwin)
+		self.button_fg.grid(row=3, column=1)
+		self.button_fg.insert(0, self.style.lookup("TButton", "foreground"))
+		
+		Label(self.themelistwin, text="Buttons relief:").grid(row=4, column=0)
+		self.button_rf = Entry(self.themelistwin)
+		self.button_rf.grid(row=4, column=1)
+		self.button_rf.insert(0, self.style.lookup("TButton", "relief"))
+		
+		Button(self.themelistwin, text="Save", command=self.saveTheme).grid(row=10, column=0)
+		self.themelistwin.bind('<Return>', lambda evt: self.saveTheme())
+		
+	def saveTheme(self):
+		self.manager.getConfig('theme')._set('theme_outputwin', self.textbox_bg.get())
+		self.manager.getConfig('theme')._set('theme_outputwin_font', self.textbox_fg.get())
+		self.manager.process.log.textbox.configure(bg=self.textbox_bg.get())
+		self.manager.process.log.textbox.configure(fg=self.textbox_fg.get())
+		self.style.configure("TButton", padding=self.button_fbg.get(), relief=self.button_rf.get(), background=self.button_bg.get(), foreground=self.button_fg.get())
+		
+		data = {
+			'button': {
+				'padding': self.button_fbg.get(), 'relief': self.button_rf.get(), 'background': self.button_bg.get(), 'foreground': self.button_fg.get()
+				}
+		}
+		self.manager.getConfig('theme')._set('theme', data)
+	
+	def loadTheme(self):
+		tbb = self.manager.getConfig('theme').get('theme_outputwin', self.manager.process.log.textbox['background'])
+		tbf = self.manager.getConfig('theme').get('theme_outputwin_font', self.manager.process.log.textbox['foreground'])
+
+		self.manager.process.log.textbox.configure(bg=tbb)
+		self.manager.process.log.textbox.configure(fg=tbf)
+		
+		data = self.manager.getConfig('theme').get('theme', {})
+		if data:
+			theme_b = data.get('button', None)
+			print(theme_b)
+			if theme_b:
+				print(theme_b.get('background'))
+				self.style.configure("TButton", 
+						 padding=theme_b.get('padding', self.style.lookup("TButton", "padding")), 
+						 relief=theme_b.get('relief', self.style.lookup("TButton", "relief")), 
+						 background=theme_b.get('background', self.style.lookup("TButton", "background")), 
+						 foreground=theme_b.get('foreground', self.style.lookup("TButton", "foreground"))
+						)
+			
 class AddSystemTool(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -122,7 +206,7 @@ class AddSystemTool(Command):
 		Label(self.addToolWin, text="Command:").grid(row=1, column=0)
 		self.command_entry = Entry(self.addToolWin)
 		self.command_entry.grid(row=1, column=1)
-		ttk.Button(self.addToolWin, text="Confirm", command=self.sendAddTool).grid(row=2, columnspan=2)
+		Button(self.addToolWin, text="Confirm", command=self.sendAddTool).grid(row=2, columnspan=2)
 		
 	def sendAddTool(self):
 		if self.name_entry.get() and self.command_entry.get():
@@ -218,7 +302,7 @@ class Translate(Command):
 		self.tr_output.grid(row=0, column=3)
 		self.tr_lang.grid(row=1, column=0)
 		self.tr_lang.insert('end', self.manager.conf.get('default_translator', 'de'))
-		ttk.Button(w, text="Translate", command=self.execTranslate).grid(row=1, column=1)
+		Button(w, text="Translate", command=self.execTranslate).grid(row=1, column=1)
 	
 	def execTranslate(self):
 		tolang = self.tr_lang.get()
@@ -392,9 +476,9 @@ class Eval(Command):
 		self.fileselecten.grid(row=1, column=0)
 		
 		
-		ttk.Button(w, text="Open", command=self.openFile).grid(row=1, column=1)
-		ttk.Button(w, text="Save", command=self.saveFile).grid(row=1, column=2)
-		ttk.Button(w, text="Evaluate", command=self.execute).grid(row=1, column=3)
+		Button(w, text="Open", command=self.openFile).grid(row=1, column=1)
+		Button(w, text="Save", command=self.saveFile).grid(row=1, column=2)
+		Button(w, text="Evaluate", command=self.execute).grid(row=1, column=3)
 	
 	def getPath(self):
 		if not self.fileselecten.get():

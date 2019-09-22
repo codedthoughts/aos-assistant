@@ -10,22 +10,25 @@
     ],
     "fallback": null,
     "history": [
-        "play rebecca black do you/",
-        "now playing",
-        "fave",
-        "fave Rebecca Black - The Great Divide",
-        "play HIGHSOCIETY - Fake Feat Amy",
-        "fave",
-        "play Neovaii - Crash",
-        "play Neovaii - Crash",
-        "fave"
+        "set self_message_font blue",
+        "hm",
+        "set self_message_font #111111",
+        "l",
+        "set self_message_font #999999",
+        "d",
+        "set self_message_font white",
+        "hm",
+        "play heritors of arcadia"
     ],
     "name": "Kaiser",
     "now_playing": "",
+    "search_engine": "sp",
+    "self_message_font": "white",
     "terminal": "xfce4-terminal --hold -x $s",
     "test": {
         "bork": "lol"
     },
     "teststr": "lol ok",
-    "tts": true
+    "theme_outputwin": "#aaaaaa",
+    "tts": false
 }

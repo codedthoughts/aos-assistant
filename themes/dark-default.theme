@@ -1,0 +1,29 @@
+{
+	"TButton": {
+		"map": {
+			"background": [("active", "#282a33"),
+							("!disabled", "grey")],
+			"fieldbackground": [("!disabled", "black")],
+			"foreground": [("focus", "white"),
+							("!disabled", "white")]
+		}
+	},
+	"TEntry": {
+		"map": {
+			"background": [("active", "#282a33"),
+							("!disabled", "grey")],
+			"fieldbackground": [("!disabled", "black")],
+			"foreground": [("focus", "white"),
+							("!disabled", "white")]
+		}
+	},
+	"TText": {
+		"map": {
+			"background": [("active", "#282a33"),
+							("!disabled", "grey")],
+			"fieldbackground": [("!disabled", "black")],
+			"foreground": [("focus", "white"),
+							("!disabled", "white")]
+		}
+	}
+} 

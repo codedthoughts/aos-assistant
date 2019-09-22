@@ -4,7 +4,6 @@ import psutil
 import os
 import subprocess
 from tkinter import *
-from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
 
@@ -86,14 +85,14 @@ class ContactsManager(Command):
 				self.editorprops.append(le)
 				self.editorvals.append(lv)
 			
-		self.plus_lines = ttk.Button(self.editor, text="+", command=self.add_editor_line, width=2)
+		self.plus_lines = Button(self.editor, text="+", command=self.add_editor_line, width=2)
 		self.plus_lines.grid(column=2, row=0)
 		
-		self.minus_lines = ttk.Button(self.editor, text="-", command=self.minus_editor_line, width=2)
+		self.minus_lines = Button(self.editor, text="-", command=self.minus_editor_line, width=2)
 		self.minus_lines.grid(column=3, row=0)	
 		if len(conf) <= 1:
 			self.minus_lines.config(state='disabled')
-		self.savec = ttk.Button(self.editor, text="SAVE", command=self.save_contact, width=2)
+		self.savec = Button(self.editor, text="SAVE", command=self.save_contact, width=2)
 		self.savec.grid(column=4, row=0)	
 	
 	def save_contact(self):
@@ -157,9 +156,9 @@ class ContactsManager(Command):
 		logWinScroll2.config(command=self.values.yview)
 		self.values.config(yscrollcommand=logWinScroll2.set)		
 		
-		ttk.Button(self.contactswin, text='Add Contact', command=self.newcontact).grid(column=6, row=0, sticky="nsew")
-		ttk.Button(self.contactswin, text='Edit Contact', command=self.editcontact).grid(column=6, row=1, sticky="nsew")
-		ttk.Button(self.contactswin, text='Delete Contact', command=self.deletecontact).grid(column=6, row=2, sticky="nsew")
+		Button(self.contactswin, text='Add Contact', command=self.newcontact).grid(column=6, row=0, sticky="nsew")
+		Button(self.contactswin, text='Edit Contact', command=self.editcontact).grid(column=6, row=1, sticky="nsew")
+		Button(self.contactswin, text='Delete Contact', command=self.deletecontact).grid(column=6, row=2, sticky="nsew")
 		people.bind('<<ListboxSelect>>', self.onselect)	
 		#self.values.bind('<<ListboxSelect>>', self.onselect_values)	
 		self.contactswin.protocol("WM_DELETE_WINDOW", self.closeContactsUI )

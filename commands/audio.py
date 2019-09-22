@@ -1,5 +1,4 @@
 from tkinter import *
-from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
 import json
@@ -9,6 +8,17 @@ import psutil
 import shlex
 import random 
 
+class StopAudio(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['stop']
+		self.check = self.checkFull
+		
+	def run(self, message):
+		if self.manager.conf.get('now_playing'):
+			self.manager.conf._set('now_playing', '')
+			self.manager.getCommand('ytplayer').procStop()
+			
 class NowPlaying(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -39,11 +49,23 @@ class Favouriter(Command):
 		faves.append(to_add)
 		self.manager.getConfig('youtube')._set('faves', faves)
 		self.manager.say(f"Saved {to_add}.")
+		
 class YTPlayer(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
 		self.alias = ['play']
 		manager.registerConfig('youtube') 
+		self.runThreaded = True
+		self.manager.linkHandlers['youtube.com'] = self.link_yt
+		
+	def link_yt(self, args):
+		self.manager.say("One moment...")
+		g = " -nodisp"
+		if self.manager.conf.get('radio_vis', False):
+			g = ""
+		self.manager.conf._set('now_playing', args['v'])
+		self.procStop()
+		os.system(f'youtube-dl -q -o - {args["v"]} | ffplay -{g} -autoexit -loglevel quiet&')
 		
 	def procStop(self, evt=None):
 		for p in psutil.process_iter():
@@ -65,11 +87,11 @@ class YTPlayer(Command):
 		self.manager.removeMenuOption('Media Player', 'Youtube Favourites')	
 		
 	def run(self, message):
+		self.manager.say("One moment...")
 		g = " -nodisp"
 		if self.manager.conf.get('radio_vis', False):
 			g = ""
 		
-
 		if message.startswith("http") and "youtube.com" in message:
 			self.manager.conf._set('now_playing', message)
 			self.procStop()
@@ -106,9 +128,9 @@ class YTPlayer(Command):
 		try:
 			selected = w.get(selection[0])		
 			self.fwin = Toplevel()
-			ttk.Button(self.fwin, text="Play", command=lambda: self.run(selected)).grid()
-			ttk.Button(self.fwin, text="Edit", command=lambda: self.editFave(selected)).grid()
-			ttk.Button(self.fwin, text="Delete", command=lambda: self.delFave(selected)).grid()
+			Button(self.fwin, text="Play", command=lambda: self.run(selected)).grid()
+			Button(self.fwin, text="Edit", command=lambda: self.editFave(selected)).grid()
+			Button(self.fwin, text="Delete", command=lambda: self.delFave(selected)).grid()
 			
 		except Exception as e:
 			print(e)
@@ -118,7 +140,7 @@ class YTPlayer(Command):
 		self.efwin = Toplevel()
 		self.efedit = Entry(self.efwin)
 		self.efedit.grid()
-		ttk.Button(self.efedit, text="Edit", command=lambda: self.commitEditFave(track)).grid(column=1)
+		Button(self.efedit, text="Edit", command=lambda: self.commitEditFave(track)).grid(column=1)
 	
 	def commitEditFave(self, track):
 		new = self.efedit.get()
@@ -178,15 +200,15 @@ class RadioPlayer(Command):
 		for i in range(0, 5):
 			self.radiowin.rowconfigure(i, weight=1)		
 			
-		self.playbutton = ttk.Button(self.radiowin, text="Play", command=self.playStation)
+		self.playbutton = Button(self.radiowin, text="Play", command=self.playStation)
 		self.playbutton.grid(row=0, column=2, sticky="ns")
-		self.stopbutton = ttk.Button(self.radiowin, text="Stop", command=self.stopStation)
+		self.stopbutton = Button(self.radiowin, text="Stop", command=self.stopStation)
 		self.stopbutton.grid(row=1, column=2, sticky="ns")
-		self.addbutton = ttk.Button(self.radiowin, text="Add", command=self.addStation)
+		self.addbutton = Button(self.radiowin, text="Add", command=self.addStation)
 		self.addbutton.grid(row=2, column=2, sticky="ns")
-		self.deletestation = ttk.Button(self.radiowin, text="Delete", command=self.deleteStation)
+		self.deletestation = Button(self.radiowin, text="Delete", command=self.deleteStation)
 		self.deletestation.grid(row=3, column=2, sticky="ns")
-		self.editstation = ttk.Button(self.radiowin, text="Edit", command=self.editStation)
+		self.editstation = Button(self.radiowin, text="Edit", command=self.editStation)
 		self.editstation.grid(row=4, column=2, sticky="ns")
 		for p in psutil.process_iter():
 			if p.name() == "ffplay":
@@ -260,7 +282,7 @@ class RadioPlayer(Command):
 		self.urlentry.grid(row=2, column=1, sticky="we")
 		self.tagentry = Entry(self.editui)
 		self.tagentry.grid(row=3, column=1, sticky="we")
-		ttk.Button(self.editui, text="Save", command=self.saveStation).grid(row=3, column=0)
+		Button(self.editui, text="Save", command=self.saveStation).grid(row=3, column=0)
 		
 		self.editui.columnconfigure(1, weight=1)
 			

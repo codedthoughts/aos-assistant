@@ -4,7 +4,6 @@ import psutil
 import os
 import subprocess
 from tkinter import *
-from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
 
@@ -91,7 +90,7 @@ class CountersGUI(Command):
 			
 		self.new = Entry(self.countersui)
 		self.new.grid()
-		ttk.Button(self.countersui, text="Save", command=self.addCounterSave).grid(row=1)
+		Button(self.countersui, text="Save", command=self.addCounterSave).grid(row=1)
 		
 	def addCounterSave(self):
 		if self.new.get():
@@ -106,10 +105,10 @@ class CountersGUI(Command):
 			conf = self.manager.getConfig('counters')
 			Label(self.countersui, text=self.selected_counter).grid(row=0, column=0)
 			Label(self.countersui, text=conf[self.selected_counter]).grid(row=0, column=1)
-			ttk.Button(self.countersui, text="+", command=lambda: self.modCounter('+')).grid(row=0, column=2)
-			ttk.Button(self.countersui, text="-", command=lambda: self.modCounter('-')).grid(row=0, column=3)
-			ttk.Button(self.countersui, text="X", command=lambda: self.modCounter('del')).grid(row=0, column=4)
-			ttk.Button(self.countersui, text="Back", command=lambda: self.modCounter('back')).grid(row=1, column=0, columnspan=4)
+			Button(self.countersui, text="+", command=lambda: self.modCounter('+')).grid(row=0, column=2)
+			Button(self.countersui, text="-", command=lambda: self.modCounter('-')).grid(row=0, column=3)
+			Button(self.countersui, text="X", command=lambda: self.modCounter('del')).grid(row=0, column=4)
+			Button(self.countersui, text="Back", command=lambda: self.modCounter('back')).grid(row=1, column=0, columnspan=4)
 		else:
 			conf = self.manager.getConfig('counters').get()
 			counters = Listbox(self.countersui)
@@ -118,4 +117,4 @@ class CountersGUI(Command):
 			for item in conf:
 				counters.insert('end', item)
 				
-			ttk.Button(self.countersui, text="Add", command=self.addCounter).grid(row=1)
+			Button(self.countersui, text="Add", command=self.addCounter).grid(row=1)

@@ -1,7 +1,6 @@
 from threading import Thread
 import time
 from tkinter import *
-from tkinter import ttk
 from tkinter.ttk import *
 from tkinter.messagebox import *
 import memory
@@ -15,9 +14,16 @@ import inspect
 import sys
 import arrow
 import copy
-
+import random
+import json
+import requests
+from PIL import Image, ImageTk
+from io import BytesIO
+from urllib import parse
+import webbrowser
+import re
 class OutputWindow:
-	def __init__(self, master_window=None, *, title="Message", text="", geometry="280x240", font=[], size=8, bg='white', format_links_html=False):
+	def __init__(self, master_window=None, *, title="Message", text="", geometry="280x240", font=[], size=8, bg='white', format_links_html=False, fg='black'):
 		if master_window:
 			self.frame = Frame(master_window)
 			self.master = self.frame
@@ -44,13 +50,17 @@ class OutputWindow:
 		self.textbox.tag_configure('orange', foreground='orange')
 		self.textbox.tag_configure('grey', foreground='grey')
 		self.textbox.tag_configure('gray', foreground='grey')
-		self.textbox.tag_configure('bold', font=('bold'))
+		self.textbox.tag_configure('bold', font='bold')
 		self.textbox.tag_configure('italics', font=('italics'))
 		self.textbox.tag_configure('size', font=(size))
 		self.textbox.configure(bg=bg)
+		self.textbox.configure(fg=fg)
 		self.textbox.insert('end', text, font)
+		master_window.bind('<Control-KeyRelease-c>', self._copy)
 		self.textbox.config(state="disabled")
 	
+		
+		
 	def delete(self, index, end_index):
 		self.textbox.config(state="normal")
 		self.textbox.delete(index, end_index)
@@ -90,6 +100,17 @@ class OutputWindow:
 	def _click(self, event):
 		print(event.widget)
 
+	def _copy(self, event):
+		if self.textbox.tag_ranges(SEL):
+			self.textbox.config(state="normal")
+			f = self.textbox.get(SEL_FIRST, SEL_LAST)
+			self.textbox.config(state="disabled")
+			clip = Tk()
+			clip.withdraw()
+			clip.clipboard_clear()
+			clip.clipboard_append(f) 
+			clip.destroy()
+    
 class Manager(Thread):
 	def run(self):	
 		self.scriptdir = os.path.dirname(os.path.realpath(__file__))+"/"
@@ -106,6 +127,56 @@ class Manager(Thread):
 		self.extconf = {}
 		self.history_index = 0
 		self.history = self.conf.get('history', [])
+		self.linkHandlers = {}
+	def createCommand(self, name, triggers, call, **kwargs):
+		nc = Command(self)
+		nc.__name__ = name
+		nc.alias = triggers
+		nc.run = call
+		nc.check = kwargs.get('check', nc.checkFull)
+		self.commands[name] = nc
+		return self.commands[name]
+	
+	def doWeblink(self, url):
+		#t = link.replace("http://", '')
+		#t = t.replace("https://", '')
+		t = parse.urlsplit(url).netloc
+		t = t.replace("www.", '')
+		args = dict(parse.parse_qsl(parse.urlsplit(url).query))
+		#t = t.split("/")[0]
+		print(t)
+		print(args)
+		if self.linkHandlers.get(t, None):
+			self.linkHandlers[t](args)
+		else:
+			if self.promptConfirm(f'Open {url}?'):
+				webbrowser.open(url)
+	def runAsync(self, call, arg):
+		t = Thread(target=call, args=(arg,))
+		t.start()
+	
+	def popupImage(self, url):
+		if url.startswith("http"):
+			raw_data = requests.get(url).content
+			im = Image.open(BytesIO(raw_data))
+		else:
+			im = Image.open(url)
+		
+		img = ImageTk.PhotoImage(im)
+		win = Toplevel()
+		win.transient(self.process.win)
+		Label(win, image=img).pack(fill="both", expand="yes")
+		
+		
+	def getCommand(self, name):
+		return self.commands[name]
+
+	def deleteCommand(self, name):
+		try:
+			del self.commands[name]
+			return True
+		except:
+			return False
 	
 	def addUIScrollbar(self, widget):
 		scroll = Scrollbar(widget.grid_info()['in'])
@@ -151,7 +222,7 @@ class Manager(Thread):
 			self.extconf[name] = memory.Memory(path=f'{self.scriptdir}configs/{name}.json')
 	
 	def getConfig(self, name):
-		return self.extconf.get(name, None)
+		return self.extconf.get(name, {})
 	
 	def addTool(self, name, call):
 		self.process.toolmenu.add_command(label=name, command=call)
@@ -218,6 +289,15 @@ class Manager(Thread):
 		
 		times = kargs.get('timestamp', True)
 		
+		links = re.findall(r'(https?://\S+)', message)
+		
+		if len(links) > 0:
+			m = 0
+			for link in links:
+				message = message.replace(link, f"||{link}||")
+				kargs['link_id'] = random.randint(0, 10000)
+				kargs['command'] = lambda evt: self.doWeblink(link)
+				
 		if "||" in message:
 			msg_arr = message.split("||")
 			if kargs.get('tag') == 'say':
@@ -332,8 +412,24 @@ class AssistantWindow(Thread):
 			inp = "No listen handler installed."
 		self.inputbar.insert(0, inp)
 
+	def loadThemes(self):
+		self.styler.theme_names()	
+		for file in os.listdir(self.manager.scriptdir+"themes/"):
+			filename = os.fsdecode(file)
+			if filename.endswith(".theme"):
+				raw = filename.split(".")[0]
+				self.styler.theme_create(raw.split("-")[0], raw.split("-")[1])
+				with open(self.manager.scriptdir+"themes/"+filename) as tf:
+					self.styler.theme_settings(raw.split("-")[0], eval(tf.read(), {}))
+		#print(self.styler.theme_names()	)
+		
 	def run(self):
 		self.win = Tk()
+
+		#self.styler = Style()
+		#self.loadTheme()
+		#self.styler.theme_use(self.manager.conf.get('theme', 'default'))
+		
 		self.menu = Menu(self.win)
 		self.win.config(menu=self.menu)
 		self.filemenu = Menu(self.menu, tearoff=0)
@@ -358,7 +454,8 @@ class AssistantWindow(Thread):
 		self.win.title("AthenaOS Interface")
 		self.win.protocol("WM_DELETE_WINDOW", lambda: quit())
 		self.win.geometry("640x240")
-		self.log = OutputWindow(self.win)
+		self.log = OutputWindow(self.win, bg=self.manager.getConfig('theme').get('theme_outputwin', "#aaaaaa"), fg=self.manager.getConfig('theme').get('theme_outputwin_font', "black"))
+		#print(self.log.textbox['background'])
 		self.log.master.grid(row=0, column=0, columnspan=10, rowspan=5, sticky="nswe")
 		self.inputbar = Entry(self.win)
 		self.inputbar.grid(row=6, columnspan=8, column=0, sticky="ew")
@@ -391,8 +488,8 @@ class AssistantWindow(Thread):
 		self.inputbar.bind('<Up>', cycleHistUp)
 		self.inputbar.bind('<Down>', cycleHistDown)
 		self.inputbar.bind('<Return>', self.sendMsg)
-		self.inputButton = ttk.Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=8, columnspan=1)
-		self.voiceButton = ttk.Button(self.win, text="LSTN", width=5, command=self.listen).grid(row=6, column=9, columnspan=1)
+		self.inputButton = Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=8, columnspan=1)
+		self.voiceButton = Button(self.win, text="LSTN", width=5, command=self.listen).grid(row=6, column=9, columnspan=1)
 		
 		for i in range(0, 4):
 			self.win.columnconfigure(i, weight=1)
@@ -409,6 +506,7 @@ class AssistantWindow(Thread):
 			self.manager.addTool(item, lambda: self.manager.systemCall(custom_tools[item]))	
 			
 		self.win.mainloop()
+
 
 	def clearlog(self):
 		self.log.delete('1.0', 'end')
@@ -429,14 +527,14 @@ class AssistantWindow(Thread):
 			cmds.insert('end', item)
 		cmds.bind('<<ListboxSelect>>', self.onselect_config)
 		
-		ttk.Button(self.confwin, text="Create New Entry", command=self.askCreateNew).grid(column=0, row=1, columnspan=2)
+		Button(self.confwin, text="Create New Entry", command=self.askCreateNew).grid(column=0, row=1, columnspan=2)
 	
 	def askCreateNew(self):
 		self.confwin.destroy()
 		self.askCrWin = Toplevel()
 		self.askCrEn = Entry(self.askCrWin)
 		self.askCrEn.grid()
-		ttk.Button(self.askCrWin, text="Create New Entry", command=lambda: self.editConfVar(self.askCrWin, self.askCrEn.get())).grid(column=0, row=1, columnspan=2)
+		Button(self.askCrWin, text="Create New Entry", command=lambda: self.editConfVar(self.askCrWin, self.askCrEn.get())).grid(column=0, row=1, columnspan=2)
 		
 	def destroy_config(self):
 		self.toolmenu.entryconfig("Config", state="normal")
@@ -460,12 +558,12 @@ class AssistantWindow(Thread):
 			en = Entry(editor)
 			en.pack()
 			en.insert('0', value)
-			send = ttk.Button(editor, text="Confirm", command=lambda: self.send_config(editor, cmd, en.get()))
+			send = Button(editor, text="Confirm", command=lambda: self.send_config(editor, cmd, en.get()))
 			send.pack()
 
 		elif type(value) == bool:
-			ttk.Button(editor, text="TRUE", command=lambda: self.send_config(editor, cmd, True)).pack()
-			ttk.Button(editor, text="FALSE", command=lambda: self.send_config(editor, cmd, False)).pack()
+			Button(editor, text="TRUE", command=lambda: self.send_config(editor, cmd, True)).pack()
+			Button(editor, text="FALSE", command=lambda: self.send_config(editor, cmd, False)).pack()
 			
 		else:
 			self.manager.say(f"Type {type(value)} currently not supported in live editing.")
@@ -658,26 +756,40 @@ class AssistantWindow(Thread):
 		cmd = self.inputbar.get()
 		self.manager.addHistory(cmd)
 		self.inputbar.delete(0, 'end')
-		self.log.insert(f"[ {man.conf.get('name', 'You')} ] {cmd}", font=['gray'])
+		self.log.insert(f"[ {man.conf.get('name', 'You')} ] {cmd}", font=[self.manager.conf.get('self_message_font', 'grey')])
 		
 		if self.manager.waitFor:
-			self.manager.waitFor.send(cmd)
-			return
-			
+			if self.manager.runThreaded:
+				#self.manager.waitFor.send(cmd)
+				self.manager.runAsync(self.manager.waitFor.send, cmd)
+				return
+			else:
+				self.manager.waitFor.send(cmd)
+				return
 		for item in self.manager.commands:
 			if self.manager.commands[item].check(cmd) and item not in self.manager.conf.get('disabled_commands'):
-				self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))
-				return
-
+				if self.manager.commands[item].runThreaded:
+					#self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))
+					self.manager.runAsync(self.manager.commands[item].run, cmd)
+					return
+				else:
+					self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))
+					return
+				
 		if self.manager.fallback:
-			self.manager.fallback.run(cmd)
-			
+			if self.manager.fallback.runThreaded:
+				#self.manager.fallback.run(cmd)
+				self.manager.runAsync(self.manager.fallback.run, cmd)
+			else:
+				self.manager.fallback.run(cmd)
 man = Manager()
 man.start()
 man.join()
 man.initCacheCommands()
 man.initCacheProcess()
 man.say(f"Hello, {man.conf.get('name', 'there')}.")
+#Style().configure("TButton", background=[('pressed', '!disabled', 'black'), ('active', 'white'), ('focus', 'blue')], foreground="#ffffff")
+#s.theme_use('alt')
 #man.printf(f"This is a", sep=" ")
 #man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("lol"))
 #man.printf(f".", sep="\n")
@@ -685,6 +797,7 @@ man.say(f"Hello, {man.conf.get('name', 'there')}.")
 #man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
 #man.printf(f".", sep="\n")
 #man.say(f"This ||may|| be a link.", link_id="test1", command=lambda evt: print("heh"))
-#man.printf(f"This ||iisssss|| be a link.", link_id="test1", command=lambda evt: print("heh"))
+man.printf(f"This be a link to https://www.youtube.com/watch?v=K5PNe0a04_I")
+man.printf(f"This ||iisssss|| be a link to unknown.", link_id="unknown", command=lambda evt: man.doWeblink('https://www.youtube.com/watch?v=2FLYpFMcd6Q'))
 #test = AOSProcess(man)
 #test.start()
