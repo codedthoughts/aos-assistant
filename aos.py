@@ -128,36 +128,41 @@ class Manager(Thread):
 		self.history_index = 0
 		self.history = self.conf.get('history', [])
 		self.linkHandlers = {}
-	def createCommand(self, name, triggers, call, **kwargs):
-		nc = Command(self)
-		nc.__name__ = name
-		nc.alias = triggers
-		nc.run = call
-		nc.check = kwargs.get('check', nc.checkFull)
-		self.commands[name] = nc
-		return self.commands[name]
+		self.remoteFileHandlers = {}
 	
 	def doWeblink(self, url):
 		#t = link.replace("http://", '')
 		#t = t.replace("https://", '')
+		path = parse.urlsplit(url).path
 		t = parse.urlsplit(url).netloc
 		t = t.replace("www.", '')
 		args = dict(parse.parse_qsl(parse.urlsplit(url).query))
 		#t = t.split("/")[0]
 		print(t)
 		print(args)
+		
+		for item in self.remoteFileHandlers:
+			if url.lower().endswith(item):
+				self.remoteFileHandlers[item](url)
+				return
+			
 		if self.linkHandlers.get(t, None):
-			self.linkHandlers[t](args)
+			self.linkHandlers[t](t, args, path)			
 		else:
 			if self.promptConfirm(f'Open {url}?'):
 				webbrowser.open(url)
+				
 	def runAsync(self, call, arg):
 		t = Thread(target=call, args=(arg,))
 		t.start()
 	
 	def popupImage(self, url):
+		print(url)
+		headers = {
+		'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0'
+		}
 		if url.startswith("http"):
-			raw_data = requests.get(url).content
+			raw_data = requests.get(url, headers=headers).content
 			im = Image.open(BytesIO(raw_data))
 		else:
 			im = Image.open(url)
@@ -165,7 +170,9 @@ class Manager(Thread):
 		img = ImageTk.PhotoImage(im)
 		win = Toplevel()
 		win.transient(self.process.win)
-		Label(win, image=img).pack(fill="both", expand="yes")
+		l = Label(win, image=img)
+		l.image = img
+		l.pack(fill="both", expand="yes")
 		
 		
 	def getCommand(self, name):
@@ -504,7 +511,11 @@ class AssistantWindow(Thread):
 		custom_tools = self.manager.conf.get('custom_tools', {})
 		for item in custom_tools:
 			self.manager.addTool(item, lambda: self.manager.systemCall(custom_tools[item]))	
-			
+		
+		self.manager.remoteFileHandlers['.jpeg'] = self.manager.popupImage
+		self.manager.remoteFileHandlers['.jpg'] = self.manager.popupImage
+		self.manager.remoteFileHandlers['.png'] = self.manager.popupImage
+		self.manager.remoteFileHandlers['.bmp'] = self.manager.popupImage
 		self.win.mainloop()
 
 
@@ -797,7 +808,7 @@ man.say(f"Hello, {man.conf.get('name', 'there')}.")
 #man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
 #man.printf(f".", sep="\n")
 #man.say(f"This ||may|| be a link.", link_id="test1", command=lambda evt: print("heh"))
-man.printf(f"This be a link to https://www.youtube.com/watch?v=K5PNe0a04_I")
+man.printf(f"This be a link to http://www.pngall.com/wp-content/uploads/2017/03/Vase-Download-PNG.png")
 man.printf(f"This ||iisssss|| be a link to unknown.", link_id="unknown", command=lambda evt: man.doWeblink('https://www.youtube.com/watch?v=2FLYpFMcd6Q'))
 #test = AOSProcess(man)
 #test.start()

@@ -12,8 +12,9 @@ class WhatIs(Command):
 		self.runThreaded = True
 		self.manager.linkHandlers['duckduckgo.com'] = self.run_link
 		
-	def run_link(self, args):
-		self.run(args['q'])
+	def run_link(self, link, args, path):
+		if args.get('q', None):
+			self.run(args['q'])
 		
 	def run(self, message):
 		data = DuckDuckGo().get(message)
@@ -26,8 +27,8 @@ class WhatIs(Command):
 					self.manager.printf(item['value'])
 			
 			if data['Image']:
-				print(data['Image'])
-				self.manager.popupImage(data['Image'])
+				self.manager.printf(f"{data['Image']}")
+				#self.manager.popupImage(data['Image'])
 		else:
 			self.manager.getCommand('searchfor').run(message)
 class Search(Command):
