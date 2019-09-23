@@ -10,15 +10,15 @@
     ],
     "fallback": null,
     "history": [
-        "who is chloe grace moretz",
-        "who is chloe grace moretz",
-        "who is chloe grace moretz",
-        "who is chloe grace moretz",
-        "who is chloe grace moretz",
-        "who is chloe grace moretz",
-        "who is steve buscemi",
-        "who is steve buscemi",
-        "who is steve buscemi"
+        "fave",
+        "play owl city fireflies",
+        "fave",
+        "play britney spears everytime",
+        "fave",
+        "shuffle",
+        "TheFatRat & Slaydit - Solitude",
+        "shuffle",
+        "play Best VGM 08 - Shadow Hearts II : Covenant - Battle vs Astaroth"
     ],
     "name": "Kaiser",
     "now_playing": "",
@@ -30,5 +30,5 @@
     },
     "teststr": "lol ok",
     "theme_outputwin": "#aaaaaa",
-    "tts": false
+    "tts": true
 }

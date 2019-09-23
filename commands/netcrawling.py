@@ -10,9 +10,11 @@ class WhatIs(Command):
 		super().__init__(manager)
 		self.alias = ['what is', 'who is']
 		self.runThreaded = True
-		self.manager.linkHandlers['duckduckgo.com'] = self.run_link
+		#self.manager.linkHandlers['duckduckgo.com'] = self.run_link
+		self.manager.addLinkHandler('duckduckgo.com', self.run_link)
 		
 	def run_link(self, link, args, path):
+		"""Show specific information about the query."""
 		if args.get('q', None):
 			self.run(args['q'])
 		
@@ -31,6 +33,7 @@ class WhatIs(Command):
 				#self.manager.popupImage(data['Image'])
 		else:
 			self.manager.getCommand('searchfor').run(message)
+
 class Search(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -57,7 +60,20 @@ class SearchFor(Command):
 		super().__init__(manager)
 		self.alias = ['search for']
 		self.runThreaded = True
+		#self.manager.linkHandlers['startpage.com'] = self.run_link
+		self.manager.addLinkHandler('startpage.com', self.run_links)
+		self.manager.addLinkHandler('duckduckgo.com', self.run_linkd)
 		
+	def run_links(self, link, args, path):
+		"""Search Startpage"""
+		if args.get('query', None):
+			self.run(args['query'])
+			
+	def run_linkd(self, link, args, path):
+		"""Search DuckDuckGo"""
+		if args.get('q', None):
+			self.run(args['q'])	
+			
 	def run(self, message):
 		engine = self.manager.conf.get('search_engine', 'ddg')
 		
@@ -70,3 +86,4 @@ class SearchFor(Command):
 			
 		res = s.search(message)[0]
 		self.manager.say(f"According to {res['title']}, {res['description']}")
+		self.manager.printf(f"Source: {res['url']}")

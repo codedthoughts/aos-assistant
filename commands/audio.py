@@ -8,6 +8,18 @@ import psutil
 import shlex
 import random 
 
+class ShuffleAudio(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['shuffle']
+		self.check = self.checkFull
+		manager.registerConfig('youtube') 
+	def run(self, message):
+		faves = self.manager.getConfig('youtube').get('faves')
+		rsong = random.choice(faves)
+		#self.manager.getCommand('ytplayer').run(rsong)
+		self.manager.process.inputbar.insert(0, f"play {rsong}")
+		self.manager.process.sendMsg()
 class StopAudio(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -56,16 +68,21 @@ class YTPlayer(Command):
 		self.alias = ['play']
 		manager.registerConfig('youtube') 
 		self.runThreaded = True
-		self.manager.linkHandlers['youtube.com'] = self.link_yt
+		self.manager.addLinkHandler('youtube.com', self.link_yt)
 		
-	def link_yt(self, args):
+	def link_yt(self, link, args, path):
 		self.manager.say("One moment...")
 		g = " -nodisp"
 		if self.manager.conf.get('radio_vis', False):
 			g = ""
-		self.manager.conf._set('now_playing', args['v'])
+		
+		f = self.manager.systemInvoke(f'youtube-dl {args["v"]} --dump-json')
+		name = json.loads(f)['title']
+		self.manager.conf._set('now_playing', name)
 		self.procStop()
+		self.manager.printf(f"An audio track was automatically played. Click ||here|| to stop playing.", link_id="stopaudio", command=self.procStop)
 		os.system(f'youtube-dl -q -o - {args["v"]} | ffplay -{g} -autoexit -loglevel quiet&')
+		self.manager.say(f"Now playing {name}.")
 		
 	def procStop(self, evt=None):
 		for p in psutil.process_iter():

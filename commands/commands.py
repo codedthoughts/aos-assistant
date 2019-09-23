@@ -107,7 +107,10 @@ class DefaultThemingEngine(Command):
 		self.check = self.dontCheck
 		self.manager.registerConfig('theme')
 		self.style = Style()
+		print(self.style.lookup("Tk", "background"))
+		self.style.configure("Tk", background="#000000", foreground="white")
 		
+		print(self.style.lookup("Tk", "background"))
 	def enable(self):
 		self.manager.addTool('Edit Theme', self.themeList)
 		self.loadTheme()
@@ -175,9 +178,9 @@ class DefaultThemingEngine(Command):
 		data = self.manager.getConfig('theme').get('theme', {})
 		if data:
 			theme_b = data.get('button', None)
-			print(theme_b)
+			#print(theme_b)
 			if theme_b:
-				print(theme_b.get('background'))
+				#print(theme_b.get('background'))
 				self.style.configure("TButton", 
 						 padding=theme_b.get('padding', self.style.lookup("TButton", "padding")), 
 						 relief=theme_b.get('relief', self.style.lookup("TButton", "relief")), 

@@ -22,6 +22,7 @@ from io import BytesIO
 from urllib import parse
 import webbrowser
 import re
+from functools import partial
 class OutputWindow:
 	def __init__(self, master_window=None, *, title="Message", text="", geometry="280x240", font=[], size=8, bg='white', format_links_html=False, fg='black'):
 		if master_window:
@@ -129,6 +130,27 @@ class Manager(Thread):
 		self.history = self.conf.get('history', [])
 		self.linkHandlers = {}
 		self.remoteFileHandlers = {}
+		self.defaultLinkHandler = self.openBrowser
+	
+	def addLinkHandler(self, linkname, call):
+		ls = self.linkHandlers.get(linkname, [])
+		ls.append(call)
+		self.linkHandlers[linkname] = ls
+	
+
+	def getClass(self, meth):
+		if inspect.ismethod(meth):
+			for cls in inspect.getmro(meth.__self__.__class__):
+				if cls.__dict__.get(meth.__name__) is meth:
+					return cls
+			meth = meth.__func__  # fallback to __qualname__ parsing
+		if inspect.isfunction(meth):
+			cls = getattr(inspect.getmodule(meth),
+				meth.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0])
+			if isinstance(cls, type):
+				return self.commands.get(cls.__name__.lower(), None)
+		name = getattr(meth, '__objclass__', None)
+		return self.commands.get(name.lower(), None)
 	
 	def doWeblink(self, url):
 		#t = link.replace("http://", '')
@@ -137,27 +159,55 @@ class Manager(Thread):
 		t = parse.urlsplit(url).netloc
 		t = t.replace("www.", '')
 		args = dict(parse.parse_qsl(parse.urlsplit(url).query))
-		#t = t.split("/")[0]
-		print(t)
-		print(args)
-		
+
 		for item in self.remoteFileHandlers:
 			if url.lower().endswith(item):
 				self.remoteFileHandlers[item](url)
 				return
 			
 		if self.linkHandlers.get(t, None):
-			self.linkHandlers[t](t, args, path)			
-		else:
-			if self.promptConfirm(f'Open {url}?'):
-				webbrowser.open(url)
+			handlers = self.linkHandlers[t]
+			if len(handlers) == 1:
+				if self.getClass(handlers[0]).runThreaded:
+					self.runAsync(handlers[0], t, args, path)
+				else:
+					handlers[0](t, args, path)
+			else:
+				self.multilinkwin = Toplevel()
+				row = 0
+				for item in handlers:
+					if item.__doc__:
+						Label(self.multilinkwin, text=item.__doc__).grid(row=row, column=0)
+					else:
+						Label(self.multilinkwin, text=item.__name__).grid(row=row, column=0)
+					runner = partial(self.exmultilink, handlers, row, t, args, path)
+					Button(self.multilinkwin, text="Run", command=runner).grid(row=row, column=1)
+					row += 1
 				
-	def runAsync(self, call, arg):
-		t = Thread(target=call, args=(arg,))
+				Label(self.multilinkwin, text="Open in browser").grid(row=row, column=0)
+				defrunner = partial(self.defaultLinkHandler, url)
+				Button(self.multilinkwin, text="Run", command=defrunner).grid(row=row, column=1)
+		else:
+			self.defaultLinkHandler(url)
+	
+	def exmultilink(self, handlers, row, t, args, path):
+		self.multilinkwin.destroy()
+		if self.getClass(handlers[row]).runThreaded:
+			self.runAsync(handlers[row], t, args, path)
+		else:
+			handlers[row](t, args, path)
+		
+		
+	def openBrowser(self, url):
+		if self.promptConfirm(f'Open {url}?'):
+			webbrowser.open(url)
+			
+	def runAsync(self, call, *arg):
+		t = Thread(target=call, args=tuple(arg))
 		t.start()
 	
 	def popupImage(self, url):
-		print(url)
+		#print(url)
 		headers = {
 		'User-Agent':'Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0'
 		}
@@ -767,7 +817,7 @@ class AssistantWindow(Thread):
 		cmd = self.inputbar.get()
 		self.manager.addHistory(cmd)
 		self.inputbar.delete(0, 'end')
-		self.log.insert(f"[ {man.conf.get('name', 'You')} ] {cmd}", font=[self.manager.conf.get('self_message_font', 'grey')])
+		self.manager.printf(f"[ {man.conf.get('name', 'You')} ] {cmd}", font=[self.manager.conf.get('self_message_font', 'grey')])
 		
 		if self.manager.waitFor:
 			if self.manager.runThreaded:
@@ -808,7 +858,7 @@ man.say(f"Hello, {man.conf.get('name', 'there')}.")
 #man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
 #man.printf(f".", sep="\n")
 #man.say(f"This ||may|| be a link.", link_id="test1", command=lambda evt: print("heh"))
-man.printf(f"This be a link to http://www.pngall.com/wp-content/uploads/2017/03/Vase-Download-PNG.png")
+man.printf(f"This https://duckduckgo.com/?q=colour+picker&t=ffab")
 man.printf(f"This ||iisssss|| be a link to unknown.", link_id="unknown", command=lambda evt: man.doWeblink('https://www.youtube.com/watch?v=2FLYpFMcd6Q'))
 #test = AOSProcess(man)
 #test.start()
