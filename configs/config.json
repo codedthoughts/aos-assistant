@@ -1,5 +1,7 @@
 {
-    "custom_tools": {},
+    "custom_tools": {
+        "Kill Timidity": "systemctl stop timidity"
+    },
     "custom_tools_terminal": true,
     "debug": false,
     "default_translator": "ru",
@@ -10,15 +12,15 @@
     ],
     "fallback": null,
     "history": [
-        "fave",
-        "play owl city fireflies",
-        "fave",
-        "play britney spears everytime",
-        "fave",
-        "shuffle",
-        "TheFatRat & Slaydit - Solitude",
-        "shuffle",
-        "play Best VGM 08 - Shadow Hearts II : Covenant - Battle vs Astaroth"
+        "search wikipedia for deus ex",
+        "search wikipedia for deus ex",
+        "search wikipedia for deus ex",
+        "search wikipedia for deus ex",
+        "show results for deus ex",
+        "show results for deus ex",
+        "search wikipedia for deus ex",
+        "search wikipedia for deus ex",
+        "search wikipedia for deus ex"
     ],
     "name": "Kaiser",
     "now_playing": "",

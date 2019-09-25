@@ -167,26 +167,20 @@ class Manager(Thread):
 			
 		if self.linkHandlers.get(t, None):
 			handlers = self.linkHandlers[t]
-			if len(handlers) == 1:
-				if self.getClass(handlers[0]).runThreaded:
-					self.runAsync(handlers[0], t, args, path)
+			self.multilinkwin = Toplevel()
+			row = 0
+			for item in handlers:
+				if item.__doc__:
+					Label(self.multilinkwin, text=item.__doc__).grid(row=row, column=0)
 				else:
-					handlers[0](t, args, path)
-			else:
-				self.multilinkwin = Toplevel()
-				row = 0
-				for item in handlers:
-					if item.__doc__:
-						Label(self.multilinkwin, text=item.__doc__).grid(row=row, column=0)
-					else:
-						Label(self.multilinkwin, text=item.__name__).grid(row=row, column=0)
-					runner = partial(self.exmultilink, handlers, row, t, args, path)
-					Button(self.multilinkwin, text="Run", command=runner).grid(row=row, column=1)
-					row += 1
-				
-				Label(self.multilinkwin, text="Open in browser").grid(row=row, column=0)
-				defrunner = partial(self.defaultLinkHandler, url)
-				Button(self.multilinkwin, text="Run", command=defrunner).grid(row=row, column=1)
+					Label(self.multilinkwin, text=item.__name__).grid(row=row, column=0)
+				runner = partial(self.exmultilink, handlers, row, t, args, path)
+				Button(self.multilinkwin, text="Run", command=runner).grid(row=row, column=1)
+				row += 1
+			
+			Label(self.multilinkwin, text="Open in browser").grid(row=row, column=0)
+			defrunner = partial(self.defaultLinkHandler, url)
+			Button(self.multilinkwin, text="Run", command=defrunner).grid(row=row, column=1)
 		else:
 			self.defaultLinkHandler(url)
 	
@@ -822,16 +816,16 @@ class AssistantWindow(Thread):
 		if self.manager.waitFor:
 			if self.manager.runThreaded:
 				#self.manager.waitFor.send(cmd)
-				self.manager.runAsync(self.manager.waitFor.send, cmd)
+				self.manager.runAsync(self.manager.waitFor.send, self.manager.waitFor.filterSelf(cmd))
 				return
 			else:
-				self.manager.waitFor.send(cmd)
+				self.manager.waitFor.send(self.manager.waitFor.filterSelf(cmd))
 				return
 		for item in self.manager.commands:
 			if self.manager.commands[item].check(cmd) and item not in self.manager.conf.get('disabled_commands'):
 				if self.manager.commands[item].runThreaded:
 					#self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))
-					self.manager.runAsync(self.manager.commands[item].run, cmd)
+					self.manager.runAsync(self.manager.commands[item].run, self.manager.commands[item].filterSelf(cmd))
 					return
 				else:
 					self.manager.commands[item].run(self.manager.commands[item].filterSelf(cmd))

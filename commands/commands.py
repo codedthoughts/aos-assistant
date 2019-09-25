@@ -213,7 +213,7 @@ class AddSystemTool(Command):
 		
 	def sendAddTool(self):
 		if self.name_entry.get() and self.command_entry.get():
-			self.run(f"{self.name_entry.get()} {self.command_entry.get()}")
+			self.run(f'"{self.name_entry.get()}" {self.command_entry.get()}')
 			self.addToolWin.destroy()
 			
 	def remToolMenu(self):
@@ -242,10 +242,14 @@ class AddSystemTool(Command):
 			del custom_tools[name]
 			self.manager.conf._set('custom_tools', custom_tools)
 			self.manager.removeTool(name)
+			self.remToolMenu()
+			
 	def run(self, message):
+		print(message)
 		name = shlex.split(message)[0]
-		command = message[len(name)+1:]
-		
+		command = message[len(name)+3:]
+		print(name)
+		print(command)
 		if not command:
 			command = name
 			

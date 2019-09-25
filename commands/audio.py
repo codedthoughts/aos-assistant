@@ -71,6 +71,7 @@ class YTPlayer(Command):
 		self.manager.addLinkHandler('youtube.com', self.link_yt)
 		
 	def link_yt(self, link, args, path):
+		"""Play a youtube video."""
 		self.manager.say("One moment...")
 		g = " -nodisp"
 		if self.manager.conf.get('radio_vis', False):
