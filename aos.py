@@ -131,13 +131,25 @@ class Manager(Thread):
 		self.linkHandlers = {}
 		self.remoteFileHandlers = {}
 		self.defaultLinkHandler = self.openBrowser
-	
+		self.downloadManager = None
+		
 	def addLinkHandler(self, linkname, call):
 		ls = self.linkHandlers.get(linkname, [])
 		ls.append(call)
 		self.linkHandlers[linkname] = ls
-	
-
+		
+	def addFileHandler(self, filetype, call):
+		if not filetype.startswith("."):
+			filetype = f".{filetype}"
+		ls = self.remoteFileHandlers.get(filetype, [])
+		ls.append(call)
+		self.remoteFileHandlers[filetype] = ls
+		
+	def sendCommand(self, command):
+		self.process.inputbar.delete(0, 'end')
+		self.process.inputbar.insert(0, command)
+		self.process.sendMsg()
+		
 	def getClass(self, meth):
 		if inspect.ismethod(meth):
 			for cls in inspect.getmro(meth.__self__.__class__):
@@ -159,14 +171,9 @@ class Manager(Thread):
 		t = parse.urlsplit(url).netloc
 		t = t.replace("www.", '')
 		args = dict(parse.parse_qsl(parse.urlsplit(url).query))
-
-		for item in self.remoteFileHandlers:
-			if url.lower().endswith(item):
-				self.remoteFileHandlers[item](url)
-				return
-			
-		if self.linkHandlers.get(t, None):
-			handlers = self.linkHandlers[t]
+		fileext = url.split(".")[-1]
+		if self.remoteFileHandlers.get(f".{fileext}", None):
+			handlers = self.remoteFileHandlers[f".{fileext}"]
 			self.multilinkwin = Toplevel()
 			row = 0
 			for item in handlers:
@@ -181,16 +188,50 @@ class Manager(Thread):
 			Label(self.multilinkwin, text="Open in browser").grid(row=row, column=0)
 			defrunner = partial(self.defaultLinkHandler, url)
 			Button(self.multilinkwin, text="Run", command=defrunner).grid(row=row, column=1)
+			
+			if self.downloadManager:
+				row += 1
+				
+				Label(self.multilinkwin, text="Open in Dowload Manager").grid(row=row, column=0)
+				defrunnerdl = partial(self.downloadManager, url)
+				Button(self.multilinkwin, text="Run", command=defrunnerdl).grid(row=row, column=1)
+			row += 1
+			Label(self.multilinkwin, text=f"Open file {url}").grid(row=row, column=0, columnspan=2)
+			
+			return
+			
+			
+		if self.linkHandlers.get(t, None):
+			handlers = self.linkHandlers[t]
+			self.multilinkwin = Toplevel()
+			
+			row = 0
+			for item in handlers:
+				if item.__doc__:
+					Label(self.multilinkwin, text=item.__doc__).grid(row=row, column=0)
+				else:
+					Label(self.multilinkwin, text=item.__name__).grid(row=row, column=0)
+				runner = partial(self.exmultilink, handlers, row, t, args, path)
+				Button(self.multilinkwin, text="Run", command=runner).grid(row=row, column=1)
+				row += 1
+			
+			Label(self.multilinkwin, text="Open in browser").grid(row=row, column=0)
+			defrunner = partial(self.defaultLinkHandler, url)
+			Button(self.multilinkwin, text="Run", command=defrunner).grid(row=row, column=1)
+			row += 1
+			Label(self.multilinkwin, text=f"Open page {url}").grid(row=row, column=0, columnspan=2)
 		else:
 			self.defaultLinkHandler(url)
 	
 	def exmultilink(self, handlers, row, t, args, path):
 		self.multilinkwin.destroy()
-		if self.getClass(handlers[row]).runThreaded:
-			self.runAsync(handlers[row], t, args, path)
-		else:
+		try:
+			if self.getClass(handlers[row]).runThreaded:
+				self.runAsync(handlers[row], t, args, path)
+			else:
+				handlers[row](t, args, path)
+		except AttributeError:
 			handlers[row](t, args, path)
-		
 		
 	def openBrowser(self, url):
 		if self.promptConfirm(f'Open {url}?'):
@@ -200,6 +241,11 @@ class Manager(Thread):
 		t = Thread(target=call, args=tuple(arg))
 		t.start()
 	
+	def popupImageParse(self, *args):
+		"""Show in-app"""
+		full = f"https://{args[0]}{args[2]}"
+		self.popupImage(full)
+		
 	def popupImage(self, url):
 		#print(url)
 		headers = {
@@ -432,7 +478,13 @@ class Manager(Thread):
 				modname = filename.split(".")[0]
 				if f"commands.{modname}" not in off_modules:
 					self.printf(f"Loading command module: {modname}", tag='debug')
-					importlib.import_module("commands."+modname)
+					try:
+						importlib.import_module("commands."+modname)
+					except Exception as e:
+						print(f"Captured error importing module {modname}")
+						self.printf(f"Module {modname} was not loaded.")
+						self.printf(f"{type(e)}: {e}")
+						continue
 					clsmembers = inspect.getmembers(sys.modules["commands."+modname], inspect.isclass)
 					for com in clsmembers:
 						if issubclass(com[1], Command) and com[1] != Command:
@@ -462,24 +514,9 @@ class AssistantWindow(Thread):
 		else:
 			inp = "No listen handler installed."
 		self.inputbar.insert(0, inp)
-
-	def loadThemes(self):
-		self.styler.theme_names()	
-		for file in os.listdir(self.manager.scriptdir+"themes/"):
-			filename = os.fsdecode(file)
-			if filename.endswith(".theme"):
-				raw = filename.split(".")[0]
-				self.styler.theme_create(raw.split("-")[0], raw.split("-")[1])
-				with open(self.manager.scriptdir+"themes/"+filename) as tf:
-					self.styler.theme_settings(raw.split("-")[0], eval(tf.read(), {}))
-		#print(self.styler.theme_names()	)
 		
 	def run(self):
 		self.win = Tk()
-
-		#self.styler = Style()
-		#self.loadTheme()
-		#self.styler.theme_use(self.manager.conf.get('theme', 'default'))
 		
 		self.menu = Menu(self.win)
 		self.win.config(menu=self.menu)
@@ -539,6 +576,7 @@ class AssistantWindow(Thread):
 		self.inputbar.bind('<Up>', cycleHistUp)
 		self.inputbar.bind('<Down>', cycleHistDown)
 		self.inputbar.bind('<Return>', self.sendMsg)
+		self.inputbar.bind('<Control-KeyRelease-s>', self.autoComplete)
 		self.inputButton = Button(self.win, text="Send", width=5, command=self.sendMsg).grid(row=6, column=8, columnspan=1)
 		self.voiceButton = Button(self.win, text="LSTN", width=5, command=self.listen).grid(row=6, column=9, columnspan=1)
 		
@@ -556,13 +594,26 @@ class AssistantWindow(Thread):
 		for item in custom_tools:
 			self.manager.addTool(item, lambda: self.manager.systemCall(custom_tools[item]))	
 		
-		self.manager.remoteFileHandlers['.jpeg'] = self.manager.popupImage
-		self.manager.remoteFileHandlers['.jpg'] = self.manager.popupImage
-		self.manager.remoteFileHandlers['.png'] = self.manager.popupImage
-		self.manager.remoteFileHandlers['.bmp'] = self.manager.popupImage
+		self.manager.addFileHandler('.jpeg', self.manager.popupImageParse)
+		self.manager.addFileHandler('.jpg', self.manager.popupImageParse)
+		self.manager.addFileHandler('.png', self.manager.popupImageParse)
+		self.manager.addFileHandler('.bmp', self.manager.popupImageParse)
+		
+		self.footers = Frame(self.win)
+		self.footers.grid(row=7, column=0)
+		self.win.rowconfigure(7, weight=1)
+		
 		self.win.mainloop()
 
-
+	
+	def autoComplete(self, evt):
+		for command in self.manager.commands:
+			for trigger in self.manager.commands[command].alias:
+				if trigger.startswith(self.inputbar.get()):
+					self.inputbar.delete(0, 'end')
+					self.inputbar.insert(0, f"{trigger} ")
+		self.inputbar.focus()
+		
 	def clearlog(self):
 		self.log.delete('1.0', 'end')
 	

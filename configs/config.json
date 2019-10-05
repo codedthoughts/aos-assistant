@@ -1,4 +1,11 @@
 {
+    "appimage_location": "/home/kaiz0r/Applications",
+    "bin_ignored_paths": [
+        "/home/linuxbrew/.linuxbrew/sbin",
+        "/home/kaiz0r/bin",
+        "/home/kaiz0r/bin",
+        "/home/kaiz0r/.luarocks/bin"
+    ],
     "custom_tools": {
         "Kill Timidity": "systemctl stop timidity"
     },
@@ -8,23 +15,49 @@
     "disabled_commands": [],
     "disabled_modules": [],
     "disabled_process": [
-        "test"
+        "test",
+        "networkmonitorfooter"
     ],
     "fallback": null,
+    "hidden_appimages": [
+        "KeePassXC-old.AppImage"
+    ],
     "history": [
-        "search wikipedia for deus ex",
-        "search wikipedia for deus ex",
-        "search wikipedia for deus ex",
-        "search wikipedia for deus ex",
-        "show results for deus ex",
-        "show results for deus ex",
-        "search wikipedia for deus ex",
-        "search wikipedia for deus ex",
-        "search wikipedia for deus ex"
+        "set volume to 50",
+        "mute audio",
+        "unmute audio",
+        "volume down 50",
+        "volume up",
+        "volume up",
+        "volume up 50",
+        "volume up",
+        "volume down"
     ],
     "name": "Kaiser",
     "now_playing": "",
-    "search_engine": "sp",
+    "records": {
+        "04-10-2019": [
+            {
+                "record": "opened the milk ",
+                "time": "09:00"
+            },
+            {
+                "record": "opened the milk",
+                "time": "14:42"
+            }
+        ],
+        "05-10-2019": [
+            {
+                "record": "opened the milk",
+                "time": "14:39"
+            },
+            {
+                "record": "opened the milk yesterday",
+                "time": "14:40"
+            }
+        ]
+    },
+    "search_engine": "startpage",
     "self_message_font": "white",
     "terminal": "xfce4-terminal --hold -x $s",
     "test": {
@@ -32,5 +65,5 @@
     },
     "teststr": "lol ok",
     "theme_outputwin": "#aaaaaa",
-    "tts": true
+    "tts": false
 }

@@ -187,7 +187,62 @@ class DefaultThemingEngine(Command):
 						 background=theme_b.get('background', self.style.lookup("TButton", "background")), 
 						 foreground=theme_b.get('foreground', self.style.lookup("TButton", "foreground"))
 						)
-			
+
+class AlsaVolumeSet(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['set volume to', 'set volume', 'change volume to', 'change volume']
+		
+	def run(self, message):
+		cmd = "amixer -D pulse sset Master "
+		if not message.endswith("%"):
+			message = f"{message}%"
+		os.system(cmd+message)	
+
+class AlsaVolumeControl(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['volume']
+		
+	def run(self, message):
+		cmd = "amixer -D pulse sset Master "
+		if message.lower().startswith('up'):
+			if len(message.split()) > 1:
+				inc = message.split()[1]
+				cmd += f"{inc}%+"
+			else:
+				cmd += "10%+"
+		elif message.lower().startswith('down'):
+			if len(message.split()) > 1:
+				inc = message.split()[1]
+				cmd += f"{inc}%-"
+			else:
+				cmd += "10%-"
+		else:
+			return
+		
+		os.system(cmd)	
+		
+class AlsaVolumeMute(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.check = self.checkFull
+		self.alias = ['mute audio']
+		
+	def run(self, message):
+		cmd = "amixer -D pulse sset Master 0%"
+		os.system(cmd)	
+		
+class AlsaVolumeUnMute(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.check = self.checkFull
+		self.alias = ['unmute audio']
+		
+	def run(self, message):
+		cmd = f"amixer -D pulse sset Master 60%"
+		os.system(cmd)	
+		
 class AddSystemTool(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
