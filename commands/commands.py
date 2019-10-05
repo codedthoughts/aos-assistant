@@ -243,6 +243,17 @@ class AlsaVolumeUnMute(Command):
 		cmd = f"amixer -D pulse sset Master 60%"
 		os.system(cmd)	
 		
+class TestPanelMaker(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.check = self.checkFull
+		self.alias = ['open debug panel']
+		
+	def run(self, message):
+		pman = self.manager.getProcess('panelmanager')	
+		pman.prepareCustomPanel()
+		Label(self.manager.process.panels, text="This is a debug").grid()
+		
 class AddSystemTool(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -437,6 +448,7 @@ class EightBall(Command):
 class Roll(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
+		self.alias = ['random']
 		
 	def run(self, message):
 		if message == "":
@@ -449,6 +461,8 @@ class Roll(Command):
 class Flip(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
+		self.alias = ['flip a coin']
+		self.check = self.checkFull
 		
 	def run(self, message):
 		if random.random() < 0.5:
@@ -459,6 +473,8 @@ class Flip(Command):
 class Dice(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
+		self.alias = ['roll']
+		self.check = self.checkMulti
 		
 	def run(self, message):
 		notation = message
@@ -523,7 +539,14 @@ class Eval(Command):
 		self.manager.removeMenuOption('Python', 'Evaluate')		
 		
 	def run(self, message):
-		eval(message)
+		env = {
+			'conf': self.manager.conf,
+			'manager': self.manager,
+			'window': self.manager.process,
+		}
+
+		env.update(globals())
+		eval(message, env)
 		
 	def evalmenu(self):
 		w = Toplevel()

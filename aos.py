@@ -132,7 +132,36 @@ class Manager(Thread):
 		self.remoteFileHandlers = {}
 		self.defaultLinkHandler = self.openBrowser
 		self.downloadManager = None
-		
+	
+	def addFooter(self, payload):
+		self.process.footer_widgets.append(payload)
+	
+	def removeFooter(self, name):
+		for item in self.process.footer_widgets:
+			if item.name == name:
+				self.process.footer_widgets.remove(item)
+				return item
+
+	def getFooters(self):
+		return self.process.footer_widgets
+	
+	def addPanel(self, payload):
+		if len(self.process.panel_widgets) == 0 and self.conf.get('autostart_panel', True):
+			self.process.panels.grid(row=0, column=11, sticky="nsew", rowspan=5)
+		self.process.panel_widgets.append(payload)
+	
+	def removePanel(self, name):
+		for item in self.process.panel_widgets:
+			if item.name == name:
+				self.process.panel_widgets.remove(item)
+				if len(self.process.panel_widgets) == 0:
+					self.process.panels.grid_forget()
+					
+				return item
+
+	def getPanels(self):
+		return self.process.panel_widgets	
+	
 	def addLinkHandler(self, linkname, call):
 		ls = self.linkHandlers.get(linkname, [])
 		ls.append(call)
@@ -264,7 +293,9 @@ class Manager(Thread):
 		l.image = img
 		l.pack(fill="both", expand="yes")
 		
-		
+	def getProcess(self, name):
+		return self.processes[name]
+	
 	def getCommand(self, name):
 		return self.commands[name]
 
@@ -506,7 +537,9 @@ class AssistantWindow(Thread):
 		super().__init__()
 		self.manager = manager
 		self.listenHandler = None
-	
+		self.footer_widgets = []
+		self.panel_widgets = []
+		
 	def listen(self):
 		self.inputbar.delete(0, 'end')
 		if self.listenHandler:
@@ -600,8 +633,11 @@ class AssistantWindow(Thread):
 		self.manager.addFileHandler('.bmp', self.manager.popupImageParse)
 		
 		self.footers = Frame(self.win)
-		self.footers.grid(row=7, column=0)
-		self.win.rowconfigure(7, weight=1)
+		self.footers.grid(row=7, column=0, sticky="ew", columnspan=10)
+		
+		self.panels = Frame(self.win)
+		#self.panels.grid(row=0, column=11, sticky="nsew", rowspan=5)
+		#self.win.rowconfigure(7, weight=1)
 		
 		self.win.mainloop()
 

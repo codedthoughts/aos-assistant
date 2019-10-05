@@ -1,5 +1,6 @@
 {
     "appimage_location": "/home/kaiz0r/Applications",
+    "autostart_panel": false,
     "bin_ignored_paths": [
         "/home/linuxbrew/.linuxbrew/sbin",
         "/home/kaiz0r/bin",
@@ -16,6 +17,7 @@
     "disabled_modules": [],
     "disabled_process": [
         "test",
+        "cyclefooters",
         "networkmonitorfooter"
     ],
     "fallback": null,
@@ -23,15 +25,15 @@
         "KeePassXC-old.AppImage"
     ],
     "history": [
-        "set volume to 50",
-        "mute audio",
-        "unmute audio",
-        "volume down 50",
-        "volume up",
-        "volume up",
-        "volume up 50",
-        "volume up",
-        "volume down"
+        "who is steve buscemi",
+        "who is steve buscemi",
+        "who is steve buscemi",
+        "who is steve buscemi",
+        "open debug panel",
+        "open debug panel",
+        "open debug panel",
+        "who is steve buscemi",
+        "who is chloe grace moretz"
     ],
     "name": "Kaiser",
     "now_playing": "",
