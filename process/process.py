@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 from io import BytesIO
 from os.path import expanduser
 import requests
+
 class AOSProcess(Thread):
 	def __init__(self, manager):
 		super().__init__()
@@ -177,6 +178,7 @@ class VPanel:
 		os.system("amixer -D pulse sset Master 10%-")
 	def volMute(self):
 		os.system("amixer -D pulse sset Master 0%")
+
 class NMFooterW:
 	def __init__(self):
 		self.name = "networkmanager"

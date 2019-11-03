@@ -16,13 +16,13 @@ class ContactsManager(Command):
 		self.selected_value = ""
 		
 	def enable(self):
-		self.manager.addTool('Contacts', lambda: self.openContactsUI())
+		self.manager.addMenuOption('Social', 'Contacts', lambda: self.openContactsUI())
 		
 	def disable(self):
-		self.manager.removeTool('Contacts')	
+		self.manager.removeMenuOption('Social', 'Contacts')	
 	
 	def closeContactsUI(self):
-		self.manager.enableTool('Contacts')
+		#self.manager.enableTool('Contacts')
 		self.contactswin.destroy()
 		
 	def closeEditorUI(self):
@@ -141,7 +141,7 @@ class ContactsManager(Command):
 	def openContactsUI(self):
 		self.contactswin = Toplevel()
 		self.contactswin.title("Contacts")
-		self.manager.disableTool('Contacts')	
+		#self.manager.disableTool('Contacts')	
 		people = Listbox(self.contactswin)
 		people.grid(row=0, column=0, columnspan=2, rowspan=3, sticky="nswe")
 		logWinScroll = Scrollbar(self.contactswin)

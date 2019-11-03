@@ -8,6 +8,9 @@ from tkinter.messagebox import *
 import random
 import humanfriendly
 import textblob
+from contextlib import redirect_stdout
+import io
+import textwrap
 
 class Command:
 	def __init__(self, manager):
@@ -77,117 +80,25 @@ class Command:
 			if msg.startswith(f"{type(self).__name__.lower()}"):
 				return msg[len(type(self).__name__.lower()):]
 		return msg
-	
-class SphinxListener(Command):
+
+class PipCmd(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
-		self.check = self.dontCheck
-		
-	def enable(self):
-		if not self.manager.process.listenHandler:
-			self.manager.process.listenHandler = self.listen
+		self.alias = ['pip']
+	
+	def run(self, message):
+		if message.startswith("list"):
+			self.manager.say("Loading that...")
+			self.manager.runAsync(self.getList)
+	
+	def getList(self):
+		data = pipinter = self.manager.getLib('library', 'apip').app.list()
+		out = ""
+		for item in data:
+			out += f"{item}, version {data[item]}\n"
+		self.manager.say("Here you go.")
+		self.manager.printf(out)
 			
-	def disable(self):
-		if self.manager.process.listenHandler == self.listen:
-			self.manager.process.listenHandler = None
-	
-	def listen(self):
-		self.manager.printf(f" --- SPEAK ---")
-		p = subprocess.run([self.manager.conf.get('python_command', 'python3'), self.manager.scriptdir+'sph.py'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-		output = p.stdout
-		exitcode = p.returncode
-		
-		if output:
-			return output.decode('utf-8')[:-1]
-
-class DefaultThemingEngine(Command):
-	def __init__(self, manager):
-		super().__init__(manager)
-		self.check = self.dontCheck
-		self.manager.registerConfig('theme')
-		self.style = Style()
-		print(self.style.lookup("Tk", "background"))
-		self.style.configure("Tk", background="#000000", foreground="white")
-		
-		print(self.style.lookup("Tk", "background"))
-	def enable(self):
-		self.manager.addTool('Edit Theme', self.themeList)
-		self.loadTheme()
-		
-	def disable(self):
-		self.manager.removeTool('Edit Theme')	
-
-	def themeList(self):
-		self.themelistwin = Toplevel()
-
-		Label(self.themelistwin, text="Log Window background:").grid(row=0, column=0)
-		self.textbox_bg = Entry(self.themelistwin)
-		self.textbox_bg.grid(row=0, column=1)
-		self.textbox_bg.insert(0, self.manager.process.log.textbox['background'])
-		
-		Label(self.themelistwin, text="Log Window Font Colour:").grid(row=0, column=2)
-		self.textbox_fg = Entry(self.themelistwin)
-		self.textbox_fg.grid(row=0, column=3)
-		self.textbox_fg.insert(0, self.manager.process.log.textbox['foreground'])
-		
-		Label(self.themelistwin, text="Buttons background:").grid(row=1, column=0)
-		self.button_bg = Entry(self.themelistwin)
-		self.button_bg.grid(row=1, column=1)
-		self.button_bg.insert(0, self.style.lookup("TButton", "background"))
-
-		Label(self.themelistwin, text="Buttons padding:").grid(row=2, column=0)
-		self.button_fbg = Entry(self.themelistwin)
-		self.button_fbg.grid(row=2, column=1)
-		self.button_fbg.insert(0, self.style.lookup("TButton", "padding"))
-		
-		Label(self.themelistwin, text="Buttons foreground:").grid(row=3, column=0)
-		self.button_fg = Entry(self.themelistwin)
-		self.button_fg.grid(row=3, column=1)
-		self.button_fg.insert(0, self.style.lookup("TButton", "foreground"))
-		
-		Label(self.themelistwin, text="Buttons relief:").grid(row=4, column=0)
-		self.button_rf = Entry(self.themelistwin)
-		self.button_rf.grid(row=4, column=1)
-		self.button_rf.insert(0, self.style.lookup("TButton", "relief"))
-		
-		Button(self.themelistwin, text="Save", command=self.saveTheme).grid(row=10, column=0)
-		self.themelistwin.bind('<Return>', lambda evt: self.saveTheme())
-		
-	def saveTheme(self):
-		self.manager.getConfig('theme')._set('theme_outputwin', self.textbox_bg.get())
-		self.manager.getConfig('theme')._set('theme_outputwin_font', self.textbox_fg.get())
-		self.manager.process.log.textbox.configure(bg=self.textbox_bg.get())
-		self.manager.process.log.textbox.configure(fg=self.textbox_fg.get())
-		self.style.configure("TButton", padding=self.button_fbg.get(), relief=self.button_rf.get(), background=self.button_bg.get(), foreground=self.button_fg.get())
-		
-		data = {
-			'button': {
-				'padding': self.button_fbg.get(), 'relief': self.button_rf.get(), 'background': self.button_bg.get(), 'foreground': self.button_fg.get()
-				}
-		}
-		self.manager.getConfig('theme')._set('theme', data)
-	
-	def loadTheme(self):
-		tbb = self.manager.getConfig('theme').get('theme_outputwin', self.manager.process.log.textbox['background'])
-		tbf = self.manager.getConfig('theme').get('theme_outputwin_font', self.manager.process.log.textbox['foreground'])
-
-		self.manager.process.log.textbox.configure(bg=tbb)
-		self.manager.process.log.textbox.configure(fg=tbf)
-		
-		data = self.manager.getConfig('theme').get('theme', {})
-		if data:
-			theme_b = data.get('button', None)
-			#print(theme_b)
-			if theme_b:
-				#print(theme_b.get('background'))
-				self.style.configure("TButton", 
-						 padding=theme_b.get('padding', self.style.lookup("TButton", "padding")), 
-						 relief=theme_b.get('relief', self.style.lookup("TButton", "relief")), 
-						 background=theme_b.get('background', self.style.lookup("TButton", "background")), 
-						 foreground=theme_b.get('foreground', self.style.lookup("TButton", "foreground"))
-						)
-
 class AlsaVolumeSet(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -408,6 +319,15 @@ class Translate(Command):
 		except textblob.exceptions.TranslatorError:
 			self.manager.say("There was an error on the translator side. Maybe try again later?")	
 
+class SendIRC(Command):
+	def __init__(self, manager):
+		super().__init__(manager)
+		self.alias = ['irc: ']
+		
+	def run(self, message):
+		client = self.manager.getLib('libirc', 'ircclient')
+		self.manager.runAsync(client.send, message)
+		
 class Bash(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -526,7 +446,7 @@ class Calculate(Command):
 			return self.manager.say(f"{message} evaluates to {str(value)}")
 		except Exception as e:
 			return self.manager.say("Syntax error.")
-		
+				
 class Eval(Command):
 	def __init__(self, manager):
 		super().__init__(manager)
@@ -540,13 +460,30 @@ class Eval(Command):
 		
 	def run(self, message):
 		env = {
-			'conf': self.manager.conf,
-			'manager': self.manager,
-			'window': self.manager.process,
+			'_config': self.manager.conf,
+			'_manager': self.manager,
+			'_window': self.manager.process
 		}
-
+		#message = message.strip('` \n')
 		env.update(globals())
-		eval(message, env)
+		stdout = io.StringIO()
+		
+		
+		to_compile = f'def func():\n{textwrap.indent(message, "  ")}'
+		try:
+			exec(to_compile, env)
+		except Exception as e:
+			return self.manager.say(f"An error was encounter during compilation: {e}")
+			
+		func = env['func']
+		try:
+			with redirect_stdout(stdout):
+				func()
+		except Exception as e:
+			self.manager.say(f"An error was raised: {e}")
+			
+		value = stdout.getvalue()
+		self.manager.printf(value)
 		
 	def evalmenu(self):
 		w = Toplevel()
@@ -593,8 +530,15 @@ class Eval(Command):
 		#print(path)	
 		with open(path, 'w') as f:
 			f.write(self.textbox.get(1.0, 'end'))
-				
+	
 	def execute(self):
+		self.saveFile()
+		path = self.getPath()
+		with open(path, 'r') as f:
+			#print(f.read())
+			self.run(f.read())
+			
+	def execute2(self):
 		self.saveFile()
 		path = self.getPath()
 		#os.system(f"{self.manager.get('python_command', 'python3')} {path}")

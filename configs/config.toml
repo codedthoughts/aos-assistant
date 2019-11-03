@@ -1,0 +1,44 @@
+appimage_location = "/home/kaiz0r/Applications"
+autostart_panel = false
+bin_ignored_paths = [ "/home/linuxbrew/.linuxbrew/sbin", "/home/kaiz0r/bin", "/home/kaiz0r/bin", "/home/kaiz0r/.luarocks/bin",]
+custom_tools_terminal = true
+debug = false
+default_translator = "ru"
+disabled_commands = []
+disabled_modules = [ "commands.netcrawling",]
+disabled_process = [ "test", "cyclefooters", "networkmonitorfooter",]
+hidden_appimages = [ "KeePassXC-old.AppImage",]
+history = [ "pip ls", "pip l", "pip l", "pip l", "pip list", "pip list", "pip list", "pip list", "jjj",]
+name = "Kaiser"
+now_playing = ""
+search_engine = "startpage"
+self_message_font = "white"
+terminal = "xfce4-terminal --hold -x $s"
+teststr = "lol ok"
+theme_outputwin = "#aaaaaa"
+tts = true
+
+[custom_tools]
+"Kill Timidity" = "systemctl stop timidity"
+Firefox = "/home/kaiz0r/firefox/firefox"
+Mousepad = "mousepad"
+
+[records]
+[[records.04-10-2019]]
+record = "opened the milk "
+time = "09:00"
+
+[[records.04-10-2019]]
+record = "opened the milk"
+time = "14:42"
+
+[[records.05-10-2019]]
+record = "opened the milk"
+time = "14:39"
+
+[[records.05-10-2019]]
+record = "opened the milk yesterday"
+time = "14:40"
+
+[test]
+bork = "lol"

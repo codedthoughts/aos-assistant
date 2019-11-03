@@ -6,6 +6,7 @@ from tkinter.messagebox import *
 import memory
 from commands.commands import Command
 from process.process import AOSProcess
+from library.library import AOSLibrary
 import os
 import subprocess
 import shlex
@@ -23,6 +24,23 @@ from urllib import parse
 import webbrowser
 import re
 from functools import partial
+
+"""
+do a todo command that adds messages to startup
+- revision; startup messages customization, with replacables to have dynamic messages if you want
+
+IRC module to connect to a channel
+
+do a repl command
+
+sort custom tools in the menu to add at the end, with a seperator
+
+disable the send-command if entry is empty, to prevent the empty message being sent
+
+integrate the pipin module to have a pip interface
+pipin may need additional tweaking to be threaded/async
+
+"""
 class OutputWindow:
 	def __init__(self, master_window=None, *, title="Message", text="", geometry="280x240", font=[], size=8, bg='white', format_links_html=False, fg='black'):
 		if master_window:
@@ -115,11 +133,12 @@ class OutputWindow:
 class Manager(Thread):
 	def run(self):	
 		self.scriptdir = os.path.dirname(os.path.realpath(__file__))+"/"
-		self.conf = memory.Memory(path=self.scriptdir+'configs/')
+		self.conf = memory.Memory(path=self.scriptdir+'configs/', engine='toml')
 		self.process = AssistantWindow(self)
 		self.process.start()
 		self.commands = {}
 		self.processes = {}
+		self.lib = {}
 		self.modules = {'commands': [], 'processes': []}
 		self.waitFor = None
 		self.fallback = None
@@ -132,7 +151,15 @@ class Manager(Thread):
 		self.remoteFileHandlers = {}
 		self.defaultLinkHandler = self.openBrowser
 		self.downloadManager = None
-	
+		self._delayed = []
+		
+	def getLib(self, module, member = None):
+		if not member:
+			return self.lib.get(module, None)
+		else:
+			lib = self.lib.get(module)
+			return lib.get(member)
+		
 	def addFooter(self, payload):
 		self.process.footer_widgets.append(payload)
 	
@@ -313,10 +340,11 @@ class Manager(Thread):
 		widget.config(yscrollcommand=scroll.set)
 		scroll.grid(column=widget.grid_info()['column']+1, row=widget.grid_info()['row'], sticky="ns", rowspan=widget.grid_info()['rowspan'])
 		return scroll #.grid(column=2, row=0, sticky="ns")
-		
+	
 	def systemCall(self, command):
 		term = self.conf.get('terminal', None)
-		if term:
+		bTerm = self.conf.get('run_in_terminal', False)
+		if term and bTerm:
 			os.system(term.replace('$s', command+"&"))
 		else:
 			p = subprocess.run(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -347,7 +375,7 @@ class Manager(Thread):
 		
 	def registerConfig(self, name):
 		if not self.extconf.get(name, None):
-			self.extconf[name] = memory.Memory(path=f'{self.scriptdir}configs/{name}.json')
+			self.extconf[name] = memory.Memory(path=f'{self.scriptdir}configs/{name}.toml', engine='toml')
 	
 	def getConfig(self, name):
 		return self.extconf.get(name, {})
@@ -459,7 +487,30 @@ class Manager(Thread):
 		
 			self.process.log.insert(f"{message}", **kargs)
 	
-				
+	def execImport(self, module):
+		importlib.import_module(module)
+		return inspect.getmembers(sys.modules[module])
+	
+	def initLibraries(self):
+		self.lib = {}
+		for file in os.listdir(self.scriptdir+"library/"):
+			filename = os.fsdecode(file).split(".")[0]
+			importlib.import_module(f"library.{filename}")
+			clsmembers = inspect.getmembers(sys.modules["library."+filename], inspect.isclass)
+			#self.lib[filename] = clsmembers
+			data = {}
+			for com in clsmembers:
+				if issubclass(com[1], AOSLibrary) and com[1] != AOSLibrary:
+					data[com[0].lower()] = com[1](self)
+					if hasattr(data[com[0].lower()], 'enable'):
+						if not data[com[0].lower()].delayEnable:
+							enabler = data[com[0].lower()].enable()
+						else:
+							self._delayed.append(data[com[0].lower()])
+			if data:
+				#print(f"Saving lib to data {data}")
+				self.lib[filename] = data
+		
 	def initCacheProcess(self):
 		off_modules = self.conf._get('disabled_modules')
 		off_processes = self.conf._get('disabled_process')
@@ -924,11 +975,17 @@ class AssistantWindow(Thread):
 				self.manager.runAsync(self.manager.fallback.run, cmd)
 			else:
 				self.manager.fallback.run(cmd)
+
 man = Manager()
 man.start()
 man.join()
+man.initLibraries()
 man.initCacheCommands()
 man.initCacheProcess()
+if len(man._delayed) > 0:
+	for item in man._delayed:
+		item.enable()
+		
 man.say(f"Hello, {man.conf.get('name', 'there')}.")
 #Style().configure("TButton", background=[('pressed', '!disabled', 'black'), ('active', 'white'), ('focus', 'blue')], foreground="#ffffff")
 #s.theme_use('alt')
@@ -939,7 +996,7 @@ man.say(f"Hello, {man.conf.get('name', 'there')}.")
 #man.printf(f"link", sep="", link_id="test1", command=lambda evt: print("heh"))
 #man.printf(f".", sep="\n")
 #man.say(f"This ||may|| be a link.", link_id="test1", command=lambda evt: print("heh"))
-man.printf(f"This https://duckduckgo.com/?q=colour+picker&t=ffab")
-man.printf(f"This ||iisssss|| be a link to unknown.", link_id="unknown", command=lambda evt: man.doWeblink('https://www.youtube.com/watch?v=2FLYpFMcd6Q'))
+#man.printf(f"This https://duckduckgo.com/?q=colour+picker&t=ffab")
+#man.printf(f"This ||iisssss|| be a link to unknown.", link_id="unknown", command=lambda evt: man.doWeblink('https://www.youtube.com/watch?v=2FLYpFMcd6Q'))
 #test = AOSProcess(man)
 #test.start()
