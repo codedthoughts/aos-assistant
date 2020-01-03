@@ -19,7 +19,6 @@ theme_outputwin = "#aaaaaa"
 tts = true
 
 [custom_tools]
-"Kill Timidity" = "systemctl stop timidity"
 Firefox = "/home/kaiz0r/firefox/firefox"
 Mousepad = "mousepad"
 
